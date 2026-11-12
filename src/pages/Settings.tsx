@@ -5,7 +5,8 @@ import { useUi, type Theme } from '@/store/ui'
 import { useStats } from '@/lib/hooks'
 import { todayKey, addDays, formatDate } from '@/lib/dates'
 import { PageHeader, Card, SectionTitle, Modal } from '@/components/ui'
-import { Download, Upload, Moon, Sun, Monitor } from 'lucide-react'
+import { Download, Upload, Moon, Sun, Monitor, Vibrate } from 'lucide-react'
+import { hapticsSupported, tap } from '@/lib/haptics'
 
 export default function SettingsPage() {
   const profile = useStore((s) => s.profile)
@@ -14,6 +15,8 @@ export default function SettingsPage() {
   const resetAll = useStore((s) => s.resetAll)
   const theme = useUi((s) => s.theme)
   const setTheme = useUi((s) => s.setTheme)
+  const haptics = useUi((s) => s.haptics)
+  const setHaptics = useUi((s) => s.setHaptics)
   const stats = useStats()
   const [name, setName] = useState(profile.name)
   const [start, setStart] = useState(profile.startDate ?? todayKey())
@@ -67,6 +70,14 @@ export default function SettingsPage() {
               <button key={id} onClick={() => setTheme(id as Theme)} className={clsx('rounded-2xl border p-3 flex flex-col items-center gap-1 text-sm font-medium transition', theme === id ? 'border-lavender-400 bg-lavender-50 dark:bg-lavender-500/15 shadow-glow' : 'border-line bg-card-2')}><Icon size={18} />{label}</button>
             ))}
           </div>
+        </Card>
+      </section>
+
+      <section>
+        <SectionTitle>Feedback</SectionTitle>
+        <Card className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 text-sm"><Vibrate size={18} className="text-lavender-500" /><div><div className="font-semibold">Haptic taps</div><div className="text-xs text-muted">{hapticsSupported() ? 'A short buzz when you complete quests and workouts.' : 'Not supported on this device or browser. iPhones only buzz in installed apps on recent iOS.'}</div></div></div>
+          <button role="switch" aria-checked={haptics} onClick={() => { const on = !haptics; setHaptics(on); if (on) setTimeout(() => tap(), 0) }} className={clsx('w-11 h-6 rounded-full relative transition shrink-0', haptics ? 'bg-gradient-to-r from-lavender-500 to-blush-400' : 'bg-line')}><span className={clsx('absolute top-0.5 size-5 rounded-full bg-white shadow transition', haptics ? 'left-5.5' : 'left-0.5')} /></button>
         </Card>
       </section>
 

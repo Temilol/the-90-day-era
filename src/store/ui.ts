@@ -8,6 +8,8 @@ export interface Unlock { id: string; name: string; emoji: string; desc: string;
 interface UiState {
   theme: Theme
   setTheme: (t: Theme) => void
+  haptics: boolean
+  setHaptics: (on: boolean) => void
   toasts: Toast[]
   pushToast: (t: Omit<Toast, 'id'>) => void
   dismissToast: (id: number) => void
@@ -24,6 +26,8 @@ export const useUi = create<UiState>()(
     (set) => ({
       theme: 'system',
       setTheme: (theme) => set({ theme }),
+      haptics: true,
+      setHaptics: (haptics) => set({ haptics }),
       toasts: [],
       pushToast: (t) => {
         const id = ++toastId
@@ -37,7 +41,7 @@ export const useUi = create<UiState>()(
       celebration: null,
       setCelebration: (celebration) => set({ celebration }),
     }),
-    { name: 'era-ui', partialize: (s) => ({ theme: s.theme }) },
+    { name: 'era-ui', partialize: (s) => ({ theme: s.theme, haptics: s.haptics }) },
   ),
 )
 
