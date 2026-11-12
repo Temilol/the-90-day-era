@@ -3,6 +3,8 @@ import { TOTAL_DAYS, addDays, dayNumber, dateForDay, todayKey, weekOf, chapterOf
 import { levelFor } from './xp'
 import { SELF_CARE_IDS } from '@/content/quests'
 
+export const FREEZES_PER_CHAPTER = 1
+
 export interface Stats {
   today: string
   startDate: string | null
@@ -45,6 +47,9 @@ export interface Stats {
   nsvs: number
   weights: number
   activeDates: Set<string>
+  frozenDates: Set<string>
+  freezesLeft: number // in the current chapter
+  freezesLeftByChapter: number[]
 }
 
 export function isActiveDay(d?: DayLog): boolean {
@@ -74,12 +79,14 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
   const recoveryDays = logs.filter((d) => d.recovery && !d.workout).length
 
   const activeDates = new Set(logs.filter(isActiveDay).map((d) => d.date))
+  const frozenDates = new Set(Object.keys(s.freezes || {}).filter((d) => !!startDate && dayNumber(startDate, d) >= 1 && dayNumber(startDate, d) <= TOTAL_DAYS))
+  const streakDates = new Set([...activeDates, ...frozenDates])
 
   // streak: walk back from today (or yesterday if today not yet logged)
   let streak = 0
   if (startDate && started) {
-    let cursor = activeDates.has(today) ? today : addDays(today, -1)
-    while (cursor >= startDate && activeDates.has(cursor)) {
+    let cursor = streakDates.has(today) ? today : addDays(today, -1)
+    while (cursor >= startDate && streakDates.has(cursor)) {
       streak++
       cursor = addDays(cursor, -1)
     }
@@ -89,7 +96,7 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
     let run = 0
     const end = finished ? dateForDay(startDate, TOTAL_DAYS) : today
     for (let c = startDate; c <= end; c = addDays(c, 1)) {
-      if (activeDates.has(c)) { run++; bestStreak = Math.max(bestStreak, run) } else { run = 0 }
+      if (streakDates.has(c)) { run++; bestStreak = Math.max(bestStreak, run) } else { run = 0 }
     }
   }
 
@@ -144,6 +151,8 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
   }
 
   const daysLogged = activeDates.size
+  const freezesLeftByChapter = [1, 2, 3].map((ch) => Math.max(0, FREEZES_PER_CHAPTER - [...frozenDates].filter((d) => chapterOf(dayNumber(startDate!, d)) === ch).length))
+  const freezesLeft = startDate ? freezesLeftByChapter[chapterOf(displayDay) - 1] : 0
   return {
     today, startDate, started, finished, currentDay, displayDay, daysUntilStart,
     chapter: chapterOf(displayDay), week: weekOf(displayDay),
@@ -152,7 +161,7 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
     streak, bestStreak, lifetimeXp, spentXp, spendableXp, level: levelFor(lifetimeXp),
     questsCompleted, questCounts, selfCareQuests, journalEntries, nightShiftWorkouts, dayShiftWorkouts,
     bossesDefeated, reflections, purchases: s.purchases.length, spins: s.spins.length, envelopesOpened,
-    comebacks, themesUsed, bonusMissions, weekly, nsvs: s.nsvs.length, weights: s.weights.length, activeDates,
+    comebacks, themesUsed, bonusMissions, weekly, nsvs: s.nsvs.length, weights: s.weights.length, activeDates, frozenDates, freezesLeft, freezesLeftByChapter,
   }
 }
 

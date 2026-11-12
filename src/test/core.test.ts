@@ -131,3 +131,31 @@ describe('comebacks', () => {
     expect(computeStats(useStore.getState(), addDays(start, 13)).comebacks).toBe(1)
   })
 })
+
+describe('streak freeze', () => {
+  it('patches a missed day, one per chapter, and is released by a real log', async () => {
+    const { useStore, initialState } = await import('@/store/useStore')
+    const start = '2026-01-01'
+    useStore.setState({ ...initialState(), profile: { name: 'T', startDate: start, units: 'lb', onboarded: true } })
+    const s = useStore.getState()
+    s.logWorkout(start, { minutes: 30, incline: 12, speed: 3 })
+    s.logWorkout(addDays(start, 2), { minutes: 30, incline: 12, speed: 3 })
+    const today = addDays(start, 2)
+    expect(computeStats(useStore.getState(), today).streak).toBe(1)
+    // can't freeze today or a logged day
+    expect(useStore.getState().useFreeze(today)).toBe(false)
+    expect(useStore.getState().useFreeze(start)).toBe(false)
+    expect(useStore.getState().useFreeze(addDays(start, 1))).toBe(true)
+    let st = computeStats(useStore.getState(), today)
+    expect(st.streak).toBe(3)
+    expect(st.daysLogged).toBe(2) // freeze is not an active day
+    expect(st.freezesLeftByChapter[0]).toBe(0)
+    // second freeze in chapter 1 refused
+    s.logWorkout(addDays(start, 4), { minutes: 30, incline: 12, speed: 3 })
+    expect(useStore.getState().useFreeze(addDays(start, 3))).toBe(false)
+    // logging a rest on the frozen day gives the freeze back
+    s.setRecovery(addDays(start, 1), true)
+    expect(useStore.getState().freezes[addDays(start, 1)]).toBeUndefined()
+    expect(computeStats(useStore.getState(), addDays(start, 4)).freezesLeftByChapter[0]).toBe(1)
+  })
+})

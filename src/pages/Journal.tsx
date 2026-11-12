@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { useStore } from '@/store/useStore'
@@ -37,11 +37,19 @@ export default function Journal() {
   const entries = Object.values(days).filter((x) => x.journal).sort((a, b) => b.date.localeCompare(a.date))
   const dirty = JSON.stringify({ ...draft, updatedAt: 0 }) !== JSON.stringify({ ...(d?.journal ?? {}), updatedAt: 0 })
   const doSave = () => { save(date, draft); setSaved(true); hearts() }
+  const hasContent = Object.entries(draft).some(([k, v]) => k !== 'updatedAt' && v !== undefined && v !== '')
+  const timer = useRef<number | null>(null)
+  useEffect(() => {
+    if (!dirty || !hasContent) return
+    if (timer.current) window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => { save(date, draft); setSaved(true) }, 900)
+    return () => { if (timer.current) window.clearTimeout(timer.current) }
+  }, [draft, dirty, hasContent, date, save])
   const dayN = stats.startDate ? dayNumber(stats.startDate, date) : 0
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Journal" emoji="📓" sub="A few honest lines a day. Edit any past entry." />
+      <PageHeader title="Journal" emoji="📓" sub="A few honest lines a day. Autosaves as you type. Edit any past entry." />
       <Card>
         <div className="flex items-center justify-between mb-4">
           <button className="btn-ghost p-2" onClick={() => go(-1)}><ChevronLeft /></button>
@@ -66,7 +74,7 @@ export default function Journal() {
           ))}
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted">{d?.journal?.updatedAt ? `Last saved ${new Date(d.journal.updatedAt).toLocaleString()}` : 'Not saved yet'}</span>
-            <button className="btn-primary" disabled={!dirty && saved} onClick={doSave}>{saved && !dirty ? 'Saved ✓' : 'Save entry'}</button>
+            <button className="btn-primary" disabled={!dirty && saved} onClick={doSave}>{saved && !dirty ? 'Saved ✓' : dirty ? 'Save now' : 'Save entry'}</button>
           </div>
         </div>
       </Card>

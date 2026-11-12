@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import type { DayLog, EraState, JournalEntry, Reminder, Reward, ShiftType } from '@/lib/types'
-import { todayKey, dayNumber, TOTAL_DAYS, weekOf } from '@/lib/dates'
+import { todayKey, dayNumber, TOTAL_DAYS, weekOf, chapterOf } from '@/lib/dates'
 import { XP, walkXp, walkKind, levelFor } from '@/lib/xp'
 import { computeStats } from '@/lib/stats'
 import { DEFAULT_REWARDS } from '@/content/rewards'
@@ -34,6 +34,7 @@ export function initialState(): EraState {
     ],
     spins: [],
     celebrations: {},
+    freezes: {},
   }
 }
 
@@ -69,6 +70,8 @@ export interface Actions {
   removeReminder: (id: string) => void
   recordSpin: (category: string, result: string) => void
   markCelebration: (id: string) => void
+  useFreeze: (date: string) => boolean
+  removeFreeze: (date: string) => void
   checkProgress: () => void
   importData: (raw: string) => { ok: boolean; error?: string }
   resetAll: () => void
@@ -122,6 +125,7 @@ export const useStore = create<Store>()(
           mutate((s) => {
             const d = day(s, date)
             const prevXp = s.xp.find((e) => e.id === `workout:${date}`)?.amount ?? 0
+            if (s.freezes[date]) delete s.freezes[date]
             d.workout = { kind: walkKind(minutes), minutes, incline: w.incline, speed: w.speed, theme: w.theme, notes: w.notes, loggedAt: new Date().toISOString() }
             if (d.recovery) { d.recovery = false; revoke(s, `recovery:${date}`) }
             const xp = walkXp(minutes)
@@ -147,6 +151,7 @@ export const useStore = create<Store>()(
           mutate((s) => {
             const d = day(s, date)
             if (on && d.workout) return
+            if (on && s.freezes[date]) delete s.freezes[date]
             d.recovery = on
             if (on) { if (award(s, `recovery:${date}`, XP.recovery, 'Planned recovery day', date)) toast(`+${XP.recovery} XP`, 'Rest is part of the plan') }
             else revoke(s, `recovery:${date}`)
@@ -230,6 +235,19 @@ export const useStore = create<Store>()(
         removeReminder: (id) => set((s) => { s.reminders = s.reminders.filter((x) => x.id !== id) }),
         recordSpin: (category, result) => mutate((s) => { s.spins.push({ at: new Date().toISOString(), category, result }) }),
         markCelebration: (id) => set((s) => { s.celebrations[id] = new Date().toISOString() }),
+        useFreeze: (date) => {
+          const s = get()
+          const stats = computeStats(s)
+          if (!s.profile.startDate || date >= todayKey() || !inChallenge(s, date)) return false
+          const d = s.days[date]
+          if (d?.workout || d?.recovery || s.freezes[date]) return false
+          const ch = chapterOf(dayNumber(s.profile.startDate, date))
+          if (stats.freezesLeftByChapter[ch - 1] <= 0) { toast('No freezes left this chapter', 'You get one per chapter', 'warn'); return false }
+          mutate((st) => { st.freezes[date] = new Date().toISOString() })
+          toast('Streak freeze used', 'That day no longer breaks your streak', 'success')
+          return true
+        },
+        removeFreeze: (date) => mutate((s) => { delete s.freezes[date] }),
 
         checkProgress: () => {
           const before = get()

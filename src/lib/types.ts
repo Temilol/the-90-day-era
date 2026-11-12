@@ -95,4 +95,5 @@ export interface EraState {
   reminders: Reminder[]
   spins: Spin[]
   celebrations: Record<string, string>
+  freezes: Record<string, string> // date -> usedAt; patches a missed day for streak purposes
 }

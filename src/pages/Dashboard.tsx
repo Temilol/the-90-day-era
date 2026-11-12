@@ -26,6 +26,14 @@ export default function Dashboard() {
   const quests = questsFor(today)
   const questsDone = quests.filter((q) => d?.quests?.[q.id]).length
   const unopened = Object.values(envelopes).filter((e) => !e.openedAt).length
+  const tomorrowKey = addDays(today, 1)
+  const tomorrow = useStore((s) => s.days[tomorrowKey])
+  const tomorrowTip: Record<string, string> = {
+    day: 'Day shift. Best windows: a walk before 5 AM if you’re up early, or right after you get home.',
+    night: 'Night shift. Sleep first, then walk after you wake up. The walk doesn’t care what time it is.',
+    off: 'Day off. Pick your favourite theme and take the scenic 30.',
+    recovery: 'Planned recovery. Stretch, hydrate, and log it for +10 XP.',
+  }
 
   // Chapter celebrations, shown once each
   useEffect(() => {
@@ -82,7 +90,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card className="!p-4"><div className="text-xs font-semibold uppercase tracking-wider text-muted">Progress</div><div className="h-display text-2xl mt-1">{Math.round((stats.displayDay / TOTAL_DAYS) * 100)}%</div><Progress value={stats.displayDay / TOTAL_DAYS} className="mt-2" height="h-1.5" /></Card>
         <Card className="!p-4"><div className="text-xs font-semibold uppercase tracking-wider text-muted">Active days</div><div className="h-display text-2xl mt-1">{stats.daysLogged}</div><div className="text-xs text-muted">{stats.daysRemaining} days remaining</div></Card>
-        <Card className="!p-4"><div className="text-xs font-semibold uppercase tracking-wider text-muted flex items-center gap-1"><Flame size={12} className="text-blush-500" />Streak</div><div className="h-display text-2xl mt-1">{stats.streak}</div><div className="text-xs text-muted">best {stats.bestStreak}</div></Card>
+        <Card className="!p-4"><div className="text-xs font-semibold uppercase tracking-wider text-muted flex items-center gap-1"><Flame size={12} className="text-blush-500" />Streak</div><div className="h-display text-2xl mt-1">{stats.streak}</div><div className="text-xs text-muted">best {stats.bestStreak} · {stats.freezesLeft} 🧊 left</div></Card>
         <Card className="!p-4"><div className="text-xs font-semibold uppercase tracking-wider text-muted flex items-center gap-1"><SparkIcon size={12} className="text-lavender-500" />XP</div><div className="h-display text-2xl mt-1">{stats.spendableXp}</div><div className="text-xs text-muted">{stats.lifetimeXp} lifetime</div></Card>
       </div>
 
@@ -111,6 +119,20 @@ export default function Dashboard() {
           <Swords className="text-lavender-400" size={18} />
         </Link>
       </div>
+
+      {tomorrow?.shift && !stats.finished && (
+        <Card className="!p-4 flex items-start gap-3">
+          <span className="text-2xl">{{ day: '🌤️', night: '🌙', off: '🎀', recovery: '🌿' }[tomorrow.shift]}</span>
+          <div><div className="text-xs font-bold uppercase tracking-[0.2em] text-lavender-500">Tomorrow · {formatDate(tomorrowKey)}</div><div className="text-sm mt-0.5">{tomorrowTip[tomorrow.shift]}</div></div>
+        </Card>
+      )}
+      {!tomorrow?.shift && stats.started && !stats.finished && (
+        <Link to="/shifts" className="card !p-4 flex items-center gap-3 hover:shadow-glow transition">
+          <span className="text-2xl">📅</span>
+          <div className="flex-1"><div className="text-sm font-semibold">Plan tomorrow</div><div className="text-xs text-muted">Log tomorrow’s shift and the dashboard will suggest a walk window.</div></div>
+          <ArrowRight size={16} className="text-lavender-400" />
+        </Link>
+      )}
 
       {/* Quote */}
       <Card className="text-center py-7 relative overflow-hidden">

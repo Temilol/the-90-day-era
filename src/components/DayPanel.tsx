@@ -9,6 +9,7 @@ import { THEMES } from '@/content/themes'
 import { Check, Modal } from './ui'
 import { burst, hearts } from './Celebrate'
 import { Shuffle, Trash2 } from 'lucide-react'
+import { todayKey, addDays, dayNumber } from '@/lib/dates'
 
 export const SHIFTS: { id: ShiftType; label: string; emoji: string; sub: string }[] = [
   { id: 'day', label: 'Day shift', emoji: '🌤️', sub: '6 AM – 6 PM' },
@@ -51,10 +52,17 @@ export function WorkoutCard({ date, locked }: { date: string; locked?: boolean }
   const [strengthOpen, setStrengthOpen] = useState(false)
   const [strengthMin, setStrengthMin] = useState(10)
   const theme = themeFor(date, d?.themeOverride)
+  const startDate = useStore((s) => s.profile.startDate)
+  const yesterdayKey = addDays(date, -1)
+  const yesterday = useStore((s) => s.days[yesterdayKey])
+  const [toYesterday, setToYesterday] = useState(false)
+  const lateNight = date === todayKey() && new Date().getHours() < 6 && !!startDate && dayNumber(startDate, yesterdayKey) >= 1 && !yesterday?.workout
 
   const done = !!d?.workout
   const complete = (mins: number, inc: number, spd: number, n?: string) => {
-    logWorkout(date, { minutes: mins, incline: inc, speed: spd, theme: theme.id, notes: n })
+    const target = lateNight && toYesterday ? yesterdayKey : date
+    logWorkout(target, { minutes: mins, incline: inc, speed: spd, theme: theme.id, notes: n })
+    setToYesterday(false)
     if (mins >= 30) burst(); else hearts()
     setCustom(false)
   }
@@ -68,7 +76,7 @@ export function WorkoutCard({ date, locked }: { date: string; locked?: boolean }
       <div className={clsx('p-5 relative', done ? 'bg-gradient-to-br from-lavender-500 via-lavender-500 to-blush-400 text-white' : 'bg-gradient-to-br from-lavender-50 to-blush-50 dark:from-lavender-500/15 dark:to-blush-500/10')}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className={clsx('text-xs font-bold uppercase tracking-[0.2em]', done ? 'text-white/80' : 'text-lavender-500')}>{done ? 'Workout complete' : 'Today’s workout'}</div>
+            <div className={clsx('text-xs font-bold uppercase tracking-[0.2em]', done ? 'text-white/80' : 'text-lavender-500')}>{done ? 'Workout complete' : date === todayKey() ? 'Today’s workout' : 'The walk'}</div>
             <div className="h-display text-2xl mt-1">{done ? `${d!.workout!.minutes} min logged` : 'The Standard'}</div>
             <div className={clsx('text-sm mt-1', done ? 'text-white/85' : 'text-muted')}>
               {done ? `Incline ${d!.workout!.incline} · ${d!.workout!.speed} mph · +${walkXp(d!.workout!.minutes)} XP` : 'Incline 12 · 3.0 mph · 30 minutes'}
@@ -76,6 +84,12 @@ export function WorkoutCard({ date, locked }: { date: string; locked?: boolean }
           </div>
           <motion.div animate={done ? { rotate: [0, -10, 10, 0] } : {}} className="text-4xl">{done ? '🏆' : '🚶‍♀️'}</motion.div>
         </div>
+        {!done && !locked && lateNight && (
+          <button onClick={() => setToYesterday(!toYesterday)} className={clsx('mt-4 w-full rounded-2xl border p-3 text-left text-sm flex items-center gap-3 transition', toYesterday ? 'border-lavender-400 bg-white/70 dark:bg-white/10' : 'border-line bg-white/40 dark:bg-white/5')}>
+            <span className={clsx('size-5 rounded-full grid place-items-center text-xs shrink-0', toYesterday ? 'bg-lavender-500 text-white' : 'border border-line bg-white dark:bg-white/10')}>{toYesterday ? '✓' : ''}</span>
+            <span><span className="font-semibold">Post-shift walk? Count it toward yesterday</span><span className="block text-xs text-muted">It’s before 6 AM. Day {dayNumber(startDate!, yesterdayKey)} hasn’t got a walk yet.</span></span>
+          </button>
+        )}
         {!done && !locked && (
           <div className="mt-4 grid grid-cols-2 gap-2">
             <button className="btn-primary py-3" onClick={() => complete(30, 12, 3)}>Complete standard walk</button>

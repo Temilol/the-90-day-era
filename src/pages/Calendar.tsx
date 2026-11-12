@@ -14,6 +14,8 @@ export default function Calendar() {
   const days = useStore((s) => s.days)
   const start = stats.startDate
   const [sel, setSel] = useState<number | null>(null)
+  const useFreeze = useStore((s) => s.useFreeze)
+  const removeFreeze = useStore((s) => s.removeFreeze)
 
   if (!start) return <PageHeader title="90-Day Calendar" emoji="🗓️" sub="Set a start date in Settings first." />
 
@@ -23,6 +25,7 @@ export default function Calendar() {
     if (date > stats.today) return 'upcoming'
     if (d?.workout) return d.workout.minutes >= 30 ? 'done' : 'modified'
     if (d?.recovery) return 'recovery'
+    if (stats.frozenDates.has(date)) return 'frozen'
     if (date === stats.today) return 'today'
     return 'missed'
   }
@@ -30,6 +33,7 @@ export default function Calendar() {
     done: 'bg-gradient-to-br from-lavender-500 to-blush-400 text-white shadow-glow',
     modified: 'bg-lavender-200 dark:bg-lavender-500/50 text-lavender-800 dark:text-white',
     recovery: 'bg-mint-300/60 dark:bg-mint-400/30 text-ink',
+    frozen: 'bg-sky-200/70 dark:bg-sky-400/25 text-ink',
     missed: 'bg-card-2 text-muted',
     today: 'bg-card ring-2 ring-lavender-400 text-ink',
     upcoming: 'bg-card border border-line text-muted/70',
@@ -43,7 +47,7 @@ export default function Calendar() {
       <PageHeader title="90-Day Calendar" emoji="🗓️" sub={stats.finished ? 'Era complete.' : stats.started ? `${daysToGo} days until Day 90 · ${formatDate(dateForDay(start, 90), { month: 'long', day: 'numeric' })}` : `Starts ${formatDate(start, { month: 'long', day: 'numeric' })}`} />
 
       <div className="flex flex-wrap gap-2 text-xs">
-        {[['done', 'Standard walk'], ['modified', 'Modified walk'], ['recovery', 'Recovery'], ['missed', 'Unlogged'], ['today', 'Today'], ['upcoming', 'Upcoming']].map(([k, l]) => (
+        {[['done', 'Standard walk'], ['modified', 'Modified walk'], ['recovery', 'Recovery'], ['frozen', 'Streak freeze'], ['missed', 'Unlogged'], ['today', 'Today'], ['upcoming', 'Upcoming']].map(([k, l]) => (
           <span key={k} className="inline-flex items-center gap-1.5 text-muted"><span className={clsx('size-4 rounded-md inline-block', dot[k])} />{l}</span>
         ))}
       </div>
@@ -92,6 +96,19 @@ export default function Calendar() {
             ) : (
               <>
                 <div><div className="label">Shift</div><ShiftPicker date={selDate} compact /></div>
+                {selDate < stats.today && !selLog?.workout && !selLog?.recovery && (
+                  stats.frozenDates.has(selDate) ? (
+                    <div className="rounded-2xl border border-sky-300/60 bg-sky-200/30 dark:bg-sky-400/15 p-3 text-sm flex items-center justify-between gap-3">
+                      <div><div className="font-semibold">🧊 Streak freeze applied</div><div className="text-xs text-muted">This day doesn’t break your streak. Logging a walk or rest here gives the freeze back.</div></div>
+                      <button className="btn-ghost !py-1.5 text-xs" onClick={() => removeFreeze(selDate)}>Undo</button>
+                    </div>
+                  ) : (() => { const left = stats.freezesLeftByChapter[CHAPTERS.find((c) => sel >= c.from && sel <= c.to)!.n - 1]; return (
+                    <div className="rounded-2xl bg-card-2 p-3 text-sm flex items-center justify-between gap-3">
+                      <div><div className="font-semibold">🧊 Life happened?</div><div className="text-xs text-muted">{left > 0 ? `Use a streak freeze so this day doesn’t count against you. ${left} left this chapter.` : 'No freezes left this chapter. Logging a rest or walk here still repairs your streak.'}</div></div>
+                      <button className="btn-soft !py-1.5 text-xs shrink-0" disabled={left <= 0} onClick={() => useFreeze(selDate)}>Freeze</button>
+                    </div>
+                  ) })()
+                )}
                 <WorkoutCard date={selDate} />
                 <div><div className="label">Quests</div><QuestList date={selDate} /></div>
                 {selLog?.journal && <div className="text-xs text-muted">Journal entry saved · <Link to={`/journal?date=${selDate}`} className="text-lavender-600 dark:text-lavender-300 font-medium">open</Link></div>}
