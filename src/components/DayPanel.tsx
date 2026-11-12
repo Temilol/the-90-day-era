@@ -8,6 +8,7 @@ import type { ShiftType } from '@/lib/types'
 import { THEMES } from '@/content/themes'
 import { Check, Modal } from './ui'
 import { burst, hearts } from './Celebrate'
+import { tap } from '@/lib/haptics'
 import { Shuffle, Trash2 } from 'lucide-react'
 import { todayKey, addDays, dayNumber } from '@/lib/dates'
 
@@ -62,6 +63,7 @@ export function WorkoutCard({ date, locked }: { date: string; locked?: boolean }
   const complete = (mins: number, inc: number, spd: number, n?: string) => {
     const target = lateNight && toYesterday ? yesterdayKey : date
     logWorkout(target, { minutes: mins, incline: inc, speed: spd, theme: theme.id, notes: n })
+    tap([15, 40, 25])
     setToYesterday(false)
     if (mins >= 30) burst(); else hearts()
     setCustom(false)
@@ -186,7 +188,7 @@ export function QuestList({ date, locked }: { date: string; locked?: boolean }) 
     <div className="space-y-2">
       <div className="flex items-center justify-between text-xs text-muted px-1"><span>{doneCount}/{quests.length} complete · {XP.quest} XP each</span>{doneCount === quests.length && <span className="gradient-text font-bold">All done ✦</span>}</div>
       {quests.map((q) => (
-        <Check key={q.id} disabled={locked} checked={!!d?.quests?.[q.id]} onChange={() => { toggleQuest(date, q.id); if (!d?.quests?.[q.id] && doneCount + 1 === quests.length) burst() }} label={q.title} sub={q.hint} emoji={q.emoji} />
+        <Check key={q.id} disabled={locked} checked={!!d?.quests?.[q.id]} onChange={() => { toggleQuest(date, q.id); tap(); if (!d?.quests?.[q.id] && doneCount + 1 === quests.length) burst() }} label={q.title} sub={q.hint} emoji={q.emoji} />
       ))}
       {d?.bonusMission && (
         <div className="relative">

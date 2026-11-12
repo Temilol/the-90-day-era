@@ -56,6 +56,9 @@ export interface Reward {
   cost: number
   emoji: string
   custom?: boolean
+  image?: string // small data URL
+  link?: string
+  note?: string
 }
 
 export interface Purchase {

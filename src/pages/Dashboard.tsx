@@ -7,7 +7,9 @@ import { useStats, quoteFor, greeting, questsFor } from '@/lib/hooks'
 import { formatDate, dateForDay, TOTAL_DAYS, addDays } from '@/lib/dates'
 import { CHAPTERS, MILESTONES } from '@/content/chapters'
 import { BOSSES, bossProgress } from '@/content/bosses'
-import { weekLogs } from '@/lib/stats'
+import { weekLogs, chapterStats } from '@/lib/stats'
+import { THEMES } from '@/content/themes'
+import { BADGES } from '@/content/badges'
 import { Card, Progress, Ring, Sparkles, Modal } from '@/components/ui'
 import { burst } from '@/components/Celebrate'
 import { ArrowRight, Flame, Sparkles as SparkIcon, Swords, Gift, CalendarDays, BookHeart, ShoppingBag, Trophy } from 'lucide-react'
@@ -49,6 +51,8 @@ export default function Dashboard() {
   const boss = BOSSES[stats.week - 1]
   const bp = bossProgress(boss, weekLogs(useStore.getState(), stats.week), stats, Object.keys(useStore.getState().bossTasks[boss.id] || {}).length)
   const bossDone = useStore.getState().xp.some((e) => e.id === `boss:${boss.id}`)
+  const bossClose = !bossDone && bp.total > 0 && bp.total - bp.done <= 1
+  const claimBoss = useStore.getState().claimBoss
   const workoutDone = !!d?.workout
   const restDone = !!d?.recovery
 
@@ -104,19 +108,22 @@ export default function Dashboard() {
             <p className="text-sm text-muted mt-1">{chapter.theme}</p>
             <Progress value={chapterPct} className="mt-4" />
             <div className="flex justify-between text-xs text-muted mt-1.5"><span>Day {chapter.from}</span><span>Next milestone: Day {nextMilestone} · {formatDate(dateForDay(stats.startDate!, nextMilestone))}</span></div>
+            {CHAPTERS.filter((c) => stats.currentDay > c.to).length > 0 && (
+              <div className="flex gap-2 mt-3 flex-wrap">{CHAPTERS.filter((c) => stats.currentDay > c.to).map((c) => <button key={c.n} onClick={() => setCelebration(`ch${c.n}`)} className="chip bg-card-2 text-muted hover:text-ink">{c.emoji} Chapter {c.n} recap</button>)}</div>
+            )}
           </div>
         </Card>
 
         {/* Boss */}
-        <Link to="/bosses" className="card p-5 flex items-center gap-4 hover:shadow-glow transition">
+        <Link to="/bosses" className={`card p-5 flex items-center gap-4 hover:shadow-glow transition ${bossClose ? 'ring-2 ring-gold-400' : ''}`}>
           <div className="size-14 rounded-2xl grid place-items-center text-3xl bg-gradient-to-br from-lavender-100 to-blush-100 dark:from-lavender-500/30 dark:to-blush-500/20">{boss.emoji}</div>
           <div className="flex-1 min-w-0">
             <div className="text-xs font-bold uppercase tracking-[0.2em] text-lavender-500">Week {stats.week} boss</div>
             <div className="font-semibold truncate">{boss.name}</div>
             <Progress value={bossDone ? 1 : bp.pct} className="mt-2" height="h-1.5" color={bossDone ? 'from-mint-400 to-mint-300' : undefined} />
-            <div className="text-xs text-muted mt-1">{bossDone ? 'Defeated ⚔️' : `${Math.round(bp.pct * 100)}% · ${bp.done}/${bp.total}`}</div>
+            <div className="text-xs text-muted mt-1">{bossDone ? 'Defeated ⚔️' : bp.complete ? 'Ready to claim!' : bossClose ? `One step left · ${bp.done}/${bp.total}` : `${Math.round(bp.pct * 100)}% · ${bp.done}/${bp.total}`}</div>
           </div>
-          <Swords className="text-lavender-400" size={18} />
+          {bp.complete && !bossDone ? <button onClick={(e) => { e.preventDefault(); claimBoss(boss.id); burst({ big: true }) }} className="btn-primary !py-1.5 text-xs shrink-0">Claim</button> : <Swords className="text-lavender-400" size={18} />}
         </Link>
       </div>
 
@@ -161,7 +168,7 @@ export default function Dashboard() {
       </div>
 
       <Modal open={!!celebration} onClose={() => { if (celebration) markCelebration(celebration); setCelebration(null) }}>
-        {celebration && (() => { const c = CHAPTERS.find((x) => `ch${x.n}` === celebration)!; return (
+        {celebration && (() => { const c = CHAPTERS.find((x) => `ch${x.n}` === celebration)!; const cs = chapterStats(useStore.getState(), c.n); const fav = THEMES.find((t) => t.id === cs.favoriteTheme); return (
           <div className="text-center relative overflow-hidden -m-5 sm:-m-6 p-8">
             <Sparkles />
             <div className="relative">
@@ -169,6 +176,17 @@ export default function Dashboard() {
               <div className="text-7xl my-4 animate-float">{c.emoji}</div>
               <h3 className="h-display text-3xl gradient-text">{c.name} complete</h3>
               <p className="text-muted mt-3 leading-relaxed">{c.celebration}</p>
+              <div className="grid grid-cols-3 gap-2 mt-5 text-left">
+                {[['🚶‍♀️', cs.workouts, 'walks'], ['⏱️', cs.minutes, 'minutes'], ['✨', cs.xp, 'XP'], ['🔥', cs.bestStreak, 'best streak'], ['🗺️', cs.quests, 'quests'], ['⚔️', cs.bosses, 'bosses']].map(([e, v, l]) => (
+                  <div key={l as string} className="rounded-2xl bg-card-2 p-2.5"><div className="text-lg leading-none">{e}</div><div className="h-display text-xl mt-1">{v}</div><div className="text-[11px] text-muted">{l}</div></div>
+                ))}
+              </div>
+              {(cs.badges.length > 0 || fav) && (
+                <div className="mt-4 text-sm text-muted space-y-1">
+                  {fav && <div>Favourite theme: <span className="text-ink font-medium">{fav.emoji} {fav.name}</span></div>}
+                  {cs.badges.length > 0 && <div className="flex flex-wrap justify-center gap-1 pt-1">{cs.badges.map((id) => { const b = BADGES.find((x) => x.id === id); return b ? <span key={id} className="chip bg-lavender-100 text-lavender-700 dark:bg-lavender-500/20 dark:text-lavender-200">{b.emoji} {b.name}</span> : null })}</div>}
+                </div>
+              )}
               <button className="btn-primary mt-6 w-full" onClick={() => { markCelebration(celebration); setCelebration(null); burst({ big: true }) }}>{c.n === 3 ? 'I’m a legend' : 'On to the next chapter'}</button>
             </div>
           </div>

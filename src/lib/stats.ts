@@ -1,5 +1,5 @@
 import type { DayLog, EraState } from './types'
-import { TOTAL_DAYS, addDays, dayNumber, dateForDay, todayKey, weekOf, chapterOf } from './dates'
+import { TOTAL_DAYS, addDays, dayNumber, dateForDay, todayKey, weekOf, chapterOf, parseKey } from './dates'
 import { levelFor } from './xp'
 import { SELF_CARE_IDS } from '@/content/quests'
 
@@ -174,5 +174,57 @@ export function weekLogs(s: EraState, week: number): DayLog[] {
     const d = s.days[dateForDay(start, day)]
     if (d) out.push(d)
   }
+  return out
+}
+
+export interface ChapterStats {
+  chapter: number
+  workouts: number
+  fullWorkouts: number
+  minutes: number
+  strength: number
+  recovery: number
+  xp: number
+  quests: number
+  bestStreak: number
+  activeDays: number
+  badges: string[]
+  bosses: number
+  favoriteTheme: string | null
+  journalEntries: number
+}
+
+/** Stats confined to one chapter's 30 days. Badge attribution uses unlock timestamps within the chapter's date range. */
+export function chapterStats(s: EraState, chapter: 1 | 2 | 3): ChapterStats {
+  const start = s.profile.startDate
+  const empty: ChapterStats = { chapter, workouts: 0, fullWorkouts: 0, minutes: 0, strength: 0, recovery: 0, xp: 0, quests: 0, bestStreak: 0, activeDays: 0, badges: [], bosses: 0, favoriteTheme: null, journalEntries: 0 }
+  if (!start) return empty
+  const from = dateForDay(start, (chapter - 1) * 30 + 1)
+  const to = dateForDay(start, chapter * 30)
+  const out = { ...empty }
+  const themes: Record<string, number> = {}
+  let run = 0
+  const frozen = new Set(Object.keys(s.freezes || {}))
+  for (let c = from; c <= to; c = addDays(c, 1)) {
+    const d = s.days[c]
+    if (d?.workout && d.workout.minutes >= 5) {
+      out.workouts++; out.minutes += d.workout.minutes
+      if (d.workout.minutes >= 30) out.fullWorkouts++
+      if (d.workout.theme) themes[d.workout.theme] = (themes[d.workout.theme] || 0) + 1
+    }
+    if (d?.strength) out.strength++
+    if (d?.recovery && !d.workout) out.recovery++
+    if (d) out.quests += Object.keys(d.quests || {}).length
+    if (d?.journal) out.journalEntries++
+    if (isActiveDay(d)) out.activeDays++
+    if (isActiveDay(d) || frozen.has(c)) { run++; out.bestStreak = Math.max(out.bestStreak, run) } else { run = 0 }
+  }
+  for (const e of s.xp) if (e.date >= from && e.date <= to && e.amount > 0) out.xp += e.amount
+  out.bosses = s.xp.filter((e) => e.id.startsWith('boss:') && e.date >= from && e.date <= to).length
+  const fromIso = parseKey(from).toISOString()
+  const toIso = new Date(parseKey(to).getTime() + 86_400_000).toISOString()
+  out.badges = Object.entries(s.badges).filter(([, at]) => at >= fromIso && at < toIso).map(([id]) => id)
+  const fav = Object.entries(themes).sort((a, b) => b[1] - a[1])[0]
+  out.favoriteTheme = fav ? fav[0] : null
   return out
 }

@@ -4,7 +4,9 @@ import { useStore } from '@/store/useStore'
 import { useStats } from '@/lib/hooks'
 import { PageHeader, Card, Modal, Progress, SectionTitle, Empty } from '@/components/ui'
 import { burst } from '@/components/Celebrate'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2, ImagePlus, ExternalLink, X } from 'lucide-react'
+import { XP } from '@/lib/xp'
+import { useRef } from 'react'
 import type { Reward } from '@/lib/types'
 
 export default function Shop() {
@@ -19,16 +21,28 @@ export default function Shop() {
   const [edit, setEdit] = useState<Partial<Reward> | null>(null)
   const [confirmBuy, setConfirmBuy] = useState<Reward | null>(null)
 
+  const fileRef = useRef<HTMLInputElement>(null)
   const save = () => {
     if (!edit?.name?.trim() || !edit.cost || edit.cost <= 0) return
-    if (edit.id) updateReward(edit.id, { name: edit.name.trim(), cost: Math.round(edit.cost), emoji: edit.emoji || '🎁' })
-    else addReward({ name: edit.name.trim(), cost: Math.round(edit.cost), emoji: edit.emoji || '🎁' })
+    const fields = { name: edit.name.trim(), cost: Math.round(edit.cost), emoji: edit.emoji || '🎁', image: edit.image, link: edit.link?.trim() || undefined, note: edit.note?.trim() || undefined }
+    if (edit.id) updateReward(edit.id, fields)
+    else addReward(fields)
     setEdit(null)
   }
+  const pickImage = async (f: File) => {
+    const url = await new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.readAsDataURL(f) })
+    const img = await new Promise<HTMLImageElement>((res) => { const i = new Image(); i.onload = () => res(i); i.src = url })
+    const max = 480
+    const scale = Math.min(1, max / Math.max(img.width, img.height))
+    const c = document.createElement('canvas'); c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale)
+    c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
+    setEdit((e) => ({ ...e, image: c.toDataURL('image/jpeg', 0.8) }))
+  }
+  const walksAway = (xp: number) => Math.max(1, Math.ceil(xp / XP.walkFull))
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Reward Shop" emoji="🛍️" sub="Spend XP on real-life treats. Your level never drops." action={<button className="btn-soft" onClick={() => setEdit({ emoji: '🎁', cost: 150 })}><Plus size={16} /> Add</button>} />
+      <PageHeader title="Reward Shop" emoji="🛍️" sub="Spend XP on real-life treats. Add a photo or link so you can see what you’re walking toward." action={<button className="btn-soft" onClick={() => setEdit({ emoji: '🎁', cost: 150 })}><Plus size={16} /> Add</button>} />
       <Card className="flex items-center gap-4 bg-gradient-to-br from-lavender-50 to-blush-50 dark:from-lavender-500/15 dark:to-blush-500/10">
         <div className="text-4xl">💎</div>
         <div className="flex-1"><div className="text-xs font-bold uppercase tracking-wider text-muted">Balance</div><div className="h-display text-3xl gradient-text">{stats.spendableXp} XP</div><div className="text-xs text-muted">{stats.spentXp} spent · {stats.lifetimeXp} earned</div></div>
@@ -39,19 +53,24 @@ export default function Shop() {
           const can = stats.spendableXp >= r.cost
           const owned = purchases.filter((p) => p.rewardId === r.id).length
           return (
-            <div key={r.id} className={clsx('card p-4 flex items-center gap-4', can && 'ring-1 ring-lavender-300')}>
-              <div className="size-14 rounded-2xl grid place-items-center text-3xl bg-gradient-to-br from-lavender-100 to-blush-100 dark:from-lavender-500/30 dark:to-blush-500/20">{r.emoji}</div>
+            <div key={r.id} className={clsx('card overflow-hidden', can && 'ring-1 ring-lavender-300')}>
+              {r.image && <img src={r.image} alt="" className="w-full h-36 object-cover" />}
+              <div className="p-4 flex items-center gap-4">
+              {!r.image && <div className="size-14 rounded-2xl grid place-items-center text-3xl bg-gradient-to-br from-lavender-100 to-blush-100 dark:from-lavender-500/30 dark:to-blush-500/20">{r.emoji}</div>}
               <div className="flex-1 min-w-0">
-                <div className="font-semibold truncate">{r.name}</div>
-                <div className="text-xs text-muted">{r.cost} XP{owned ? ` · unlocked ×${owned}` : ''}</div>
+                <div className="font-semibold leading-tight line-clamp-2">{r.image && <span className="mr-1">{r.emoji}</span>}{r.name}</div>
+                <div className="text-xs text-muted">{r.cost} XP{owned ? ` · unlocked ×${owned}` : ''}{!can && ` · about ${walksAway(r.cost - stats.spendableXp)} more walk${walksAway(r.cost - stats.spendableXp) === 1 ? '' : 's'}`}</div>
+                {r.note && <div className="text-xs text-muted italic truncate mt-0.5">{r.note}</div>}
+                {r.link && <a href={r.link} target="_blank" rel="noreferrer" className="text-xs text-lavender-600 dark:text-lavender-300 font-medium inline-flex items-center gap-1 mt-0.5"><ExternalLink size={11} /> Open link</a>}
                 {!can && <Progress value={stats.spendableXp / r.cost} className="mt-2" height="h-1.5" />}
               </div>
               <div className="flex flex-col items-end gap-1">
-                <button className={can ? 'btn-primary !py-1.5' : 'btn-soft !py-1.5'} disabled={!can} onClick={() => setConfirmBuy(r)}>{can ? 'Unlock' : `${r.cost - stats.spendableXp} more`}</button>
+                <button className={can ? 'btn-primary !py-1.5' : 'btn-soft !py-1.5'} disabled={!can} onClick={() => setConfirmBuy(r)}>{can ? 'Unlock' : `${r.cost - stats.spendableXp} XP to go`}</button>
                 <div className="flex gap-1">
                   <button className="btn-ghost p-1.5" onClick={() => setEdit(r)} aria-label="Edit"><Pencil size={14} /></button>
                   <button className="btn-ghost p-1.5" onClick={() => { if (confirm(`Remove "${r.name}" from the shop?`)) removeReward(r.id) }} aria-label="Remove"><Trash2 size={14} /></button>
                 </div>
+              </div>
               </div>
             </div>
           )
@@ -79,7 +98,19 @@ export default function Shop() {
               <div><label className="label">Icon</label><input className="input text-center text-xl" value={edit.emoji || ''} onChange={(e) => setEdit({ ...edit, emoji: e.target.value.slice(0, 4) })} /></div>
               <div><label className="label">Reward</label><input className="input" placeholder="A new book, a nail appointment…" value={edit.name || ''} onChange={(e) => setEdit({ ...edit, name: e.target.value })} autoFocus /></div>
             </div>
-            <div><label className="label">Cost (XP)</label><input type="number" min={5} step={5} className="input" value={edit.cost ?? ''} onChange={(e) => setEdit({ ...edit, cost: +e.target.value })} /></div>
+            <div><label className="label">Cost (XP)</label><input type="number" min={5} step={5} className="input" value={edit.cost ?? ''} onChange={(e) => setEdit({ ...edit, cost: +e.target.value })} />
+              {!!edit.cost && edit.cost > 0 && <div className="text-xs text-muted mt-1">About {walksAway(edit.cost)} standard walks from zero.</div>}</div>
+            <div>
+              <label className="label">Wishlist photo (optional)</label>
+              {edit.image ? (
+                <div className="relative"><img src={edit.image} alt="" className="w-full h-36 object-cover rounded-2xl" /><button className="absolute top-2 right-2 size-7 rounded-full bg-black/50 text-white grid place-items-center" onClick={() => setEdit({ ...edit, image: undefined })}><X size={14} /></button></div>
+              ) : (
+                <button className="btn-soft w-full" onClick={() => fileRef.current?.click()}><ImagePlus size={16} /> Add a photo of the thing</button>
+              )}
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) pickImage(f); e.target.value = '' }} />
+            </div>
+            <div><label className="label">Link (optional)</label><input className="input" placeholder="https://…" inputMode="url" value={edit.link || ''} onChange={(e) => setEdit({ ...edit, link: e.target.value })} /></div>
+            <div><label className="label">Note to self (optional)</label><input className="input" placeholder="Lilac, size M. Book the Sunday slot." value={edit.note || ''} onChange={(e) => setEdit({ ...edit, note: e.target.value })} /></div>
             <button className="btn-primary w-full" onClick={save}>Save</button>
           </div>
         )}
