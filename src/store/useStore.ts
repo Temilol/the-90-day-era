@@ -70,7 +70,7 @@ export interface Actions {
   removeReminder: (id: string) => void
   recordSpin: (category: string, result: string) => void
   markCelebration: (id: string) => void
-  useFreeze: (date: string) => boolean
+  applyFreeze: (date: string) => boolean
   removeFreeze: (date: string) => void
   checkProgress: () => void
   importData: (raw: string) => { ok: boolean; error?: string }
@@ -108,8 +108,14 @@ function inChallenge(s: EraState, date: string): boolean {
 export const useStore = create<Store>()(
   persist(
     immer((set, get) => {
+      const lifetime = (s: EraState) => s.xp.reduce((a, e) => a + Math.max(0, e.amount), 0)
       const mutate = (fn: (s: EraState) => void) => {
+        const before = levelFor(lifetime(get())).level
         set((s) => { fn(s) })
+        const after = levelFor(lifetime(get()))
+        if (after.level > before) {
+          useUi.getState().pushUnlock({ id: `level-${after.level}`, name: `Level ${after.level}: ${after.title}`, emoji: ['🌱', '🧭', '⚔️', '🏅', '💎', '🐉', '🌟', '👑'][after.level - 1] ?? '✨', desc: after.next ? `${after.toNext} XP to ${after.next.title}.` : 'Top of the ladder. Nothing left to prove.', kind: 'level' })
+        }
         get().checkProgress()
       }
       return {
@@ -117,7 +123,18 @@ export const useStore = create<Store>()(
 
         setProfile: (p) => set((s) => { Object.assign(s.profile, p) }),
         ensureDay: (date) => set((s) => { day(s, date) }),
-        setShift: (date, shift) => set((s) => { day(s, date).shift = shift }),
+        setShift: (date, shift) => {
+          const loggable = shift === 'recovery' && inChallenge(get(), date)
+          mutate((s) => {
+            const d = day(s, date)
+            d.shift = shift
+            if (loggable && !d.workout && !d.recovery) {
+              if (s.freezes[date]) delete s.freezes[date]
+              d.recovery = true
+              if (award(s, `recovery:${date}`, XP.recovery, 'Planned recovery day', date)) toast(`+${XP.recovery} XP`, 'Recovery day logged. Rest is part of the plan')
+            }
+          })
+        },
 
         logWorkout: (date, w) => {
           if (!inChallenge(get(), date)) return
@@ -235,7 +252,7 @@ export const useStore = create<Store>()(
         removeReminder: (id) => set((s) => { s.reminders = s.reminders.filter((x) => x.id !== id) }),
         recordSpin: (category, result) => mutate((s) => { s.spins.push({ at: new Date().toISOString(), category, result }) }),
         markCelebration: (id) => set((s) => { s.celebrations[id] = new Date().toISOString() }),
-        useFreeze: (date) => {
+        applyFreeze: (date) => {
           const s = get()
           const stats = computeStats(s)
           if (!s.profile.startDate || date >= todayKey() || !inChallenge(s, date)) return false
@@ -251,7 +268,6 @@ export const useStore = create<Store>()(
 
         checkProgress: () => {
           const before = get()
-          const prevLevel = levelFor(before.xp.reduce((a, e) => a + Math.max(0, e.amount), 0)).level
           const stats = computeStats(before)
           const newBadges = BADGES.filter((b) => !before.badges[b.id] && b.check(stats))
           const newEnvelopes = ENVELOPE_DEFS.filter((e) => {
@@ -261,7 +277,7 @@ export const useStore = create<Store>()(
             if (t.type === 'workouts') return stats.workouts >= t.value
             return stats.bestStreak >= t.value
           })
-          if (!newBadges.length && !newEnvelopes.length && prevLevel === stats.level.level) return
+          if (!newBadges.length && !newEnvelopes.length) return
           set((s) => {
             const now = new Date().toISOString()
             for (const b of newBadges) s.badges[b.id] = now

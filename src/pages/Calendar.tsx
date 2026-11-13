@@ -14,7 +14,7 @@ export default function Calendar() {
   const days = useStore((s) => s.days)
   const start = stats.startDate
   const [sel, setSel] = useState<number | null>(null)
-  const useFreeze = useStore((s) => s.useFreeze)
+  const applyFreeze = useStore((s) => s.applyFreeze)
   const removeFreeze = useStore((s) => s.removeFreeze)
 
   if (!start) return <PageHeader title="90-Day Calendar" emoji="🗓️" sub="Set a start date in Settings first." />
@@ -105,7 +105,7 @@ export default function Calendar() {
                   ) : (() => { const left = stats.freezesLeftByChapter[CHAPTERS.find((c) => sel >= c.from && sel <= c.to)!.n - 1]; return (
                     <div className="rounded-2xl bg-card-2 p-3 text-sm flex items-center justify-between gap-3">
                       <div><div className="font-semibold">🧊 Life happened?</div><div className="text-xs text-muted">{left > 0 ? `Use a streak freeze so this day doesn’t count against you. ${left} left this chapter.` : 'No freezes left this chapter. Logging a rest or walk here still repairs your streak.'}</div></div>
-                      <button className="btn-soft !py-1.5 text-xs shrink-0" disabled={left <= 0} onClick={() => useFreeze(selDate)}>Freeze</button>
+                      <button className="btn-soft !py-1.5 text-xs shrink-0" disabled={left <= 0} onClick={() => applyFreeze(selDate)}>Freeze</button>
                     </div>
                   ) })()
                 )}

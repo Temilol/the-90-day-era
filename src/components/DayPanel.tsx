@@ -120,8 +120,8 @@ export function WorkoutCard({ date, locked }: { date: string; locked?: boolean }
         {!done && (
           <div className="grid grid-cols-2 gap-2">
             <button disabled={locked} onClick={() => { setRecovery(date, !d?.recovery); if (!d?.recovery) hearts() }}
-              className={clsx('rounded-2xl border p-3 text-left text-sm transition', d?.recovery ? 'border-mint-400 bg-mint-300/20' : 'border-line bg-card-2')}>
-              <div className="font-semibold">🌿 {d?.recovery ? 'Recovery day logged' : 'Make this a recovery day'}</div>
+              className={clsx('rounded-2xl border p-3 text-left text-sm transition', d?.recovery ? 'border-mint-400 bg-mint-300/20' : d?.shift === 'recovery' ? 'border-mint-400 ring-2 ring-mint-300/60 bg-card-2' : 'border-line bg-card-2')}>
+              <div className="font-semibold">🌿 {d?.recovery ? 'Recovery day logged' : d?.shift === 'recovery' ? 'You planned rest. Tap to log it' : 'Make this a recovery day'}</div>
               <div className="text-xs text-muted">Planned rest. Keeps your streak. +{XP.recovery} XP</div>
             </button>
             <button disabled={locked} onClick={() => setStrengthOpen(true)}

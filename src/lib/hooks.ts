@@ -29,7 +29,9 @@ export function useStats() {
   const spins = useStore((s) => s.spins)
   const nsvs = useStore((s) => s.nsvs)
   const weights = useStore((s) => s.weights)
-  return useMemo(() => computeStats(useStore.getState(), today), [today, days, xp, purchases, profile, reflections, envelopes, spins, nsvs, weights])
+  const freezes = useStore((s) => s.freezes)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- deps are the store slices computeStats reads
+  return useMemo(() => computeStats(useStore.getState(), today), [today, days, xp, purchases, profile, reflections, envelopes, spins, nsvs, weights, freezes])
 }
 
 /** Daily quests for a date: hydration + 3 rotating, deterministic per date. */

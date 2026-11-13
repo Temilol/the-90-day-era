@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { dayNumber, dateForDay, weekOf, chapterOf, addDays, diffDays, seeded, pickN } from '@/lib/dates'
+import { dayNumber, dateForDay, weekOf, chapterOf, addDays, diffDays, seeded, pickN, todayKey as todayKeyForTest } from '@/lib/dates'
 import { walkXp, levelFor, walkKind } from '@/lib/xp'
 import { computeStats } from '@/lib/stats'
 import { useStore, initialState } from '@/store/useStore'
@@ -147,19 +147,52 @@ describe('streak freeze', () => {
     const today = addDays(start, 2)
     expect(computeStats(useStore.getState(), today).streak).toBe(1)
     // can't freeze today or a logged day
-    expect(useStore.getState().useFreeze(today)).toBe(false)
-    expect(useStore.getState().useFreeze(start)).toBe(false)
-    expect(useStore.getState().useFreeze(addDays(start, 1))).toBe(true)
+    expect(useStore.getState().applyFreeze(today)).toBe(false)
+    expect(useStore.getState().applyFreeze(start)).toBe(false)
+    expect(useStore.getState().applyFreeze(addDays(start, 1))).toBe(true)
     let st = computeStats(useStore.getState(), today)
     expect(st.streak).toBe(3)
     expect(st.daysLogged).toBe(2) // freeze is not an active day
     expect(st.freezesLeftByChapter[0]).toBe(0)
     // second freeze in chapter 1 refused
     s.logWorkout(addDays(start, 4), { minutes: 30, incline: 12, speed: 3 })
-    expect(useStore.getState().useFreeze(addDays(start, 3))).toBe(false)
+    expect(useStore.getState().applyFreeze(addDays(start, 3))).toBe(false)
     // logging a rest on the frozen day gives the freeze back
     s.setRecovery(addDays(start, 1), true)
     expect(useStore.getState().freezes[addDays(start, 1)]).toBeUndefined()
     expect(computeStats(useStore.getState(), addDays(start, 4)).freezesLeftByChapter[0]).toBe(1)
+  })
+})
+
+describe('step 1 fixes', () => {
+  const start = '2026-01-01'
+  it('announces a level-up exactly once', async () => {
+    const { useStore, initialState } = await import('@/store/useStore')
+    const { useUi } = await import('@/store/ui')
+    useStore.setState({ ...initialState(), profile: { name: 'T', startDate: start, units: 'lb', onboarded: true } })
+    useUi.setState({ unlocks: [] })
+    const s = useStore.getState()
+    for (let i = 0; i < 5; i++) s.logWorkout(addDays(start, i), { minutes: 30, incline: 12, speed: 3 })
+    const levels = () => useUi.getState().unlocks.filter((u) => u.kind === 'level')
+    expect(levels()).toHaveLength(1)
+    expect(levels()[0].name).toContain('Explorer')
+    s.logWorkout(addDays(start, 4), { minutes: 30, incline: 12, speed: 3 })
+    expect(levels()).toHaveLength(1)
+  })
+  it('choosing the Recovery shift logs the recovery day, but not for future days or walked days', async () => {
+    const { useStore, initialState } = await import('@/store/useStore')
+    const today = todayKeyForTest()
+    useStore.setState({ ...initialState(), profile: { name: 'T', startDate: addDays(today, -3), units: 'lb', onboarded: true } })
+    const s = useStore.getState()
+    s.setShift(today, 'recovery')
+    expect(useStore.getState().days[today].recovery).toBe(true)
+    expect(useStore.getState().xp.filter((e) => e.id === `recovery:${today}`)).toHaveLength(1)
+    s.setShift(today, 'recovery')
+    expect(useStore.getState().xp.filter((e) => e.id === `recovery:${today}`)).toHaveLength(1)
+    s.setShift(addDays(today, 1), 'recovery')
+    expect(useStore.getState().days[addDays(today, 1)].recovery).toBeFalsy()
+    s.logWorkout(addDays(today, -1), { minutes: 30, incline: 12, speed: 3 })
+    s.setShift(addDays(today, -1), 'recovery')
+    expect(useStore.getState().days[addDays(today, -1)].recovery).toBeFalsy()
   })
 })

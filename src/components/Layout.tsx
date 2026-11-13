@@ -42,6 +42,7 @@ export function Layout() {
     return () => mq.removeEventListener('change', fn)
   }, [theme])
   useEffect(() => { setMore(false); window.scrollTo({ top: 0 }) }, [loc.pathname])
+  useEffect(() => { useStore.getState().checkProgress() }, [stats.today])
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
