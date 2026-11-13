@@ -3,6 +3,7 @@ import { useStore } from '@/store/useStore'
 import { useStats, quoteFor } from '@/lib/hooks'
 import { formatDate, TOTAL_DAYS } from '@/lib/dates'
 import { ShiftPicker, WorkoutCard, QuestList } from '@/components/DayPanel'
+import { WalkPlanCard } from '@/components/WalkPlan'
 import { Card, PageHeader, SectionTitle } from '@/components/ui'
 import { CHAPTERS } from '@/content/chapters'
 import { BookHeart, Gift } from 'lucide-react'
@@ -36,9 +37,9 @@ export default function Today() {
       <PageHeader title="Today’s Mission" emoji="🎯" sub={`Day ${stats.displayDay} of ${TOTAL_DAYS} · ${formatDate(today, { weekday: 'long', month: 'long', day: 'numeric' })} · ${chapter.emoji} ${chapter.name}`} />
 
       <section>
-        <SectionTitle sub="Log your shift so reminders and stats know the context.">1. What kind of day is it?</SectionTitle>
+        <SectionTitle sub="Your shift sets today’s walk plan and shapes one of your quests." action={<Link to="/shifts" className="btn-soft !py-1.5 text-xs">Fill in schedule</Link>}>1. What kind of day is it?</SectionTitle>
         <ShiftPicker date={today} />
-        {d?.shift === 'night' && <p className="text-xs text-muted mt-2">Night shift tip: sleep first. A walk after you wake up counts just the same as one before work.</p>}
+        <div className="mt-3"><WalkPlanCard date={today} /></div>
       </section>
 
       <section>

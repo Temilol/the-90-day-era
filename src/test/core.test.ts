@@ -32,8 +32,8 @@ describe('dates', () => {
 describe('xp', () => {
   it('walk xp tiers', () => {
     expect(walkXp(3)).toBe(0); expect(walkXp(5)).toBe(10); expect(walkXp(10)).toBe(10)
-    expect(walkXp(11)).toBe(20); expect(walkXp(20)).toBe(20); expect(walkXp(21)).toBe(30)
-    expect(walkXp(30)).toBe(30); expect(walkXp(31)).toBe(35)
+    expect(walkXp(11)).toBe(15); expect(walkXp(20)).toBe(15); expect(walkXp(21)).toBe(25)
+    expect(walkXp(30)).toBe(25); expect(walkXp(31)).toBe(30)
     expect(walkKind(30)).toBe('standard'); expect(walkKind(15)).toBe('modified'); expect(walkKind(40)).toBe('extended')
   })
   it('levels', () => {
@@ -57,9 +57,9 @@ describe('store', () => {
     s.logWorkout(start, { minutes: 30, incline: 12, speed: 3 })
     s.logWorkout(start, { minutes: 30, incline: 12, speed: 3 })
     expect(useStore.getState().xp.filter((e) => e.id === `workout:${start}`)).toHaveLength(1)
-    expect(computeStats(useStore.getState(), start).lifetimeXp).toBe(30)
+    expect(computeStats(useStore.getState(), start).lifetimeXp).toBe(25)
     s.logWorkout(start, { minutes: 15, incline: 12, speed: 3 })
-    expect(computeStats(useStore.getState(), start).lifetimeXp).toBe(20)
+    expect(computeStats(useStore.getState(), start).lifetimeXp).toBe(15)
     s.removeWorkout(start)
     expect(computeStats(useStore.getState(), start).lifetimeXp).toBe(0)
   })
@@ -74,14 +74,14 @@ describe('store', () => {
     for (let i = 0; i < 4; i++) s.logWorkout(addDays(start, i), { minutes: 30, incline: 12, speed: 3 })
     const today = addDays(start, 3)
     let st = computeStats(useStore.getState(), today)
-    expect(st.lifetimeXp).toBe(120); expect(st.level.level).toBe(1)
+    expect(st.lifetimeXp).toBe(100); expect(st.level.level).toBe(1)
     for (let i = 4; i < 6; i++) s.logWorkout(addDays(start, i), { minutes: 30, incline: 12, speed: 3 })
     st = computeStats(useStore.getState(), addDays(start, 5))
-    expect(st.lifetimeXp).toBe(180); expect(st.level.level).toBe(2)
+    expect(st.lifetimeXp).toBe(150); expect(st.level.level).toBe(2)
     expect(s.buyReward('coffee')).toBe(true)
     expect(s.buyReward('coffee')).toBe(false)
     st = computeStats(useStore.getState(), addDays(start, 5))
-    expect(st.spendableXp).toBe(80); expect(st.lifetimeXp).toBe(180); expect(st.level.level).toBe(2)
+    expect(st.spendableXp).toBe(50); expect(st.lifetimeXp).toBe(150); expect(st.level.level).toBe(2)
   })
   it('streak counts recovery days and resets on gaps', () => {
     const s = useStore.getState()
@@ -173,7 +173,7 @@ describe('step 1 fixes', () => {
     useStore.setState({ ...initialState(), profile: { name: 'T', startDate: start, units: 'lb', onboarded: true } })
     useUi.setState({ unlocks: [] })
     const s = useStore.getState()
-    for (let i = 0; i < 5; i++) s.logWorkout(addDays(start, i), { minutes: 30, incline: 12, speed: 3 })
+    for (let i = 0; i < 6; i++) s.logWorkout(addDays(start, i), { minutes: 30, incline: 12, speed: 3 })
     const levels = () => useUi.getState().unlocks.filter((u) => u.kind === 'level')
     expect(levels()).toHaveLength(1)
     expect(levels()[0].name).toContain('Explorer')
@@ -257,5 +257,138 @@ describe('progress photos', () => {
     expect(view.getUint32(end, true)).toBe(0x06054b50)
     expect(view.getUint16(end + 10, true)).toBe(2)
     expect(view.getUint32(view.getUint32(end + 16, true), true)).toBe(0x02014b50)
+  })
+})
+
+describe('shifts with impact', () => {
+  const day1 = '2026-01-01'
+  const fresh = () => useStore.setState({ ...initialState(), profile: { name: 'T', startDate: day1, units: 'lb', onboarded: true } })
+  const xpOf = (id: string) => useStore.getState().xp.find((e) => e.id === id)?.amount ?? 0
+
+  it('adds the shift bonus on day and night shifts only, and it follows the shift', () => {
+    fresh()
+    const s = useStore.getState()
+    s.setShift(day1, 'night')
+    s.logWorkout(day1, { minutes: 30, incline: 12, speed: 3 })
+    expect(xpOf(`workout:${day1}`)).toBe(25)
+    expect(xpOf(`shiftbonus:${day1}`)).toBe(5)
+    s.setShift(day1, 'off')
+    expect(xpOf(`shiftbonus:${day1}`)).toBe(0)
+    s.setShift(day1, 'elective')
+    expect(xpOf(`shiftbonus:${day1}`)).toBe(0)
+    expect(useStore.getState().days[day1].hours).toEqual({ start: '08:00', end: '17:00' })
+    s.setShift(day1, 'day')
+    expect(xpOf(`shiftbonus:${day1}`)).toBe(5)
+    expect(useStore.getState().days[day1].hours).toBeUndefined()
+    s.logWorkout(day1, { minutes: 10, incline: 12, speed: 3 })
+    expect(useStore.getState().xp.filter((e) => e.id === `shiftbonus:${day1}`)).toHaveLength(1)
+    expect(computeStats(useStore.getState(), day1).lifetimeXp).toBe(15)
+    s.removeWorkout(day1)
+    expect(computeStats(useStore.getState(), day1).lifetimeXp).toBe(0)
+  })
+  it('leaves walks logged under the old values alone', () => {
+    fresh()
+    useStore.setState((st) => ({ days: { ...st.days, [day1]: { date: day1, quests: {}, workout: { kind: 'standard', minutes: 30, incline: 12, speed: 3, loggedAt: `${day1}T10:00:00.000Z` } } }, xp: [{ id: `workout:${day1}`, amount: 30, reason: '30-minute walk', date: day1, at: `${day1}T10:00:00.000Z` }] }))
+    useStore.getState().setShift(day1, 'day')
+    expect(computeStats(useStore.getState(), day1).lifetimeXp).toBe(30)
+  })
+  it('fills a schedule, keeps hand-set and logged days, and stays editable', async () => {
+    const { planFill } = await import('@/lib/schedule')
+    fresh()
+    const s = useStore.getState()
+    s.setShift('2026-01-03', 'off') // set by hand
+    s.setShift(day1, 'day'); s.logWorkout(day1, { minutes: 30, incline: 12, speed: 3 }) // logged
+    const opts = { from: day1, to: '2026-01-06', pattern: ['night', 'night', 'elective'] as const, hours: { start: '10:00', end: '16:00' }, keepMine: true }
+    expect(planFill(useStore.getState().days, { ...opts, pattern: [...opts.pattern] }).map((p) => p.kept)).toEqual([true, false, true, false, false, false])
+    expect(s.fillShifts({ ...opts, pattern: [...opts.pattern] })).toBe(4)
+    const d = useStore.getState().days
+    expect(['2026-01-01', '2026-01-02', '2026-01-03', '2026-01-04', '2026-01-05', '2026-01-06'].map((k) => d[k].shift)).toEqual(['day', 'night', 'off', 'night', 'night', 'elective'])
+    expect(d['2026-01-06'].hours).toEqual({ start: '10:00', end: '16:00' })
+    expect(d['2026-01-02'].shiftSet).toBe('plan')
+    // without "keep mine", hand-set days are replaced but a logged day still isn't
+    expect(s.fillShifts({ from: day1, to: '2026-01-03', pattern: ['recovery'], keepMine: false })).toBe(2)
+    expect(useStore.getState().days[day1].shift).toBe('day')
+    expect(useStore.getState().days['2026-01-03'].recovery).toBeFalsy() // planning rest doesn't log it
+    s.setShift('2026-01-02', 'off')
+    expect(useStore.getState().days['2026-01-02'].shiftSet).toBe('me')
+  })
+  it('draws one quest that fits the shift, skips clashes, varies by day, and keeps ticked quests', async () => {
+    const { questsFor } = await import('@/lib/hooks')
+    const { QUEST_POOL } = await import('@/content/quests')
+    const seen = new Set<string>()
+    for (let i = 0; i < 40; i++) {
+      const date = addDays(day1, i)
+      for (const shift of ['day', 'night', 'off', 'recovery', 'elective'] as const) {
+        const q = questsFor(date, shift)
+        expect(q).toHaveLength(4)
+        expect(q[0].id).toBe('hydrate')
+        expect(new Set(q.map((x) => x.id)).size).toBe(4)
+        expect(q[1].fits).toContain(shift)
+        expect(q.some((x) => x.avoid?.includes(shift))).toBe(false)
+        expect(questsFor(date, shift)).toEqual(q)
+        if (shift === 'night') seen.add(q[1].id)
+      }
+    }
+    expect(seen.size).toBeGreaterThan(3) // not the same night quest every time
+    for (const s of ['day', 'night', 'off', 'recovery', 'elective'] as const) expect(QUEST_POOL.filter((q) => q.fits?.includes(s)).length).toBeGreaterThanOrEqual(5)
+    const kept = questsFor(day1, 'night', { 'batch-cook': 'x', hydrate: 'x' })
+    expect(kept).toHaveLength(4)
+    expect(kept.map((x) => x.id)).toContain('batch-cook')
+    expect(questsFor(day1)).toHaveLength(4)
+  })
+  it('plans walk windows around the shift', async () => {
+    const { planFor, planStatus, clock, usualWalkTime } = await import('@/lib/walkPlan')
+    const dayPlan = planFor('day')
+    expect(dayPlan.windows.map((w) => [clock(w.start), clock(w.end)])).toEqual([['4:30 AM', '5:15 AM'], ['6:45 PM', '8:30 PM']])
+    const night = planFor('night')
+    expect(night.windows.map((w) => [clock(w.start), clock(w.end)])).toEqual([['3:30 PM', '4:45 PM']])
+    const late = planFor('elective', { start: '10:00', end: '18:00' })
+    expect(late.windows.map((w) => clock(w.start))).toEqual(['8 AM', '6:45 PM'])
+    expect(planFor('recovery').kind).toBe('rest')
+    expect(planFor(undefined).kind).toBe('none')
+    expect(planFor('off').windows).toHaveLength(1)
+    expect(planStatus(dayPlan, 3 * 60)?.text).toBe('Your window opens in 1 h 30 min')
+    expect(planStatus(dayPlan, 5 * 60)?.state).toBe('open')
+    expect(planStatus(dayPlan, 12 * 60)?.text).toBe('Next window opens in 6 h 45 min')
+    expect(planStatus(dayPlan, 22 * 60)?.state).toBe('passed')
+    // a usual time inside working hours is ignored; one outside leads the plan
+    expect(planFor('day', undefined, 12 * 60).windows[0].label).toBe('Before work')
+    expect(planFor('day', undefined, 19 * 60 + 30).windows.map((w) => w.label)).toEqual(['Before work', 'Your usual time'])
+    const at = (d: string, h: number) => new Date(`${d}T${String(h).padStart(2, '0')}:10:00`).toISOString()
+    const days = Object.fromEntries(['2026-01-01', '2026-01-02', '2026-01-03'].map((d, i) => [d, { date: d, quests: {}, shift: 'night' as const, workout: { kind: 'standard' as const, minutes: 30, incline: 12, speed: 3, loggedAt: at(d, 15 + i) } }]))
+    expect(usualWalkTime(days, 'night')).toBe(16 * 60 + 10)
+    expect(usualWalkTime(days, 'day')).toBeNull()
+  })
+  it('totals calories from typed numbers only, and other activities earn no XP', () => {
+    fresh()
+    const s = useStore.getState()
+    s.logWorkout(day1, { minutes: 30, incline: 12, speed: 3 })
+    expect(computeStats(useStore.getState(), day1).calories.total).toBe(0) // nothing typed, nothing invented
+    s.setWorkoutCalories(day1, 310)
+    s.logStrength(day1, 10, undefined, 60)
+    s.addActivity(day1, { name: 'Bike', minutes: 40, calories: 280 })
+    s.addActivity(day1, { name: 'Yoga', minutes: 20 })
+    s.logWorkout(day1, { minutes: 20, incline: 10, speed: 3 }) // editing keeps the calories
+    const before = computeStats(useStore.getState(), day1)
+    expect(before.calories.total).toBe(650)
+    expect(before.calories.byDate[day1]).toBe(650)
+    expect(before.calories.walkTotal).toBe(310)
+    expect(before.otherActivities).toBe(2)
+    expect(before.lifetimeXp).toBe(15 + 15) // walk + strength only
+    expect(before.streak).toBe(1)
+    s.setWorkoutCalories(day1, undefined)
+    s.removeActivity(day1, useStore.getState().days[day1].activities![0].id)
+    expect(computeStats(useStore.getState(), day1).calories.total).toBe(60)
+  })
+  it('counts walks by kind of day', () => {
+    fresh()
+    const s = useStore.getState()
+    s.setShift(day1, 'night'); s.logWorkout(day1, { minutes: 30, incline: 12, speed: 3 })
+    s.setShift('2026-01-02', 'night')
+    s.setShift('2026-01-03', 'off'); s.logWorkout('2026-01-03', { minutes: 20, incline: 12, speed: 3 })
+    s.setShift('2026-01-09', 'night') // in the future relative to "today" below
+    const st = computeStats(useStore.getState(), '2026-01-03')
+    expect(st.byShift.night).toEqual({ days: 2, walks: 1, minutes: 30 })
+    expect(st.byShift.off).toEqual({ days: 1, walks: 1, minutes: 20 })
   })
 })

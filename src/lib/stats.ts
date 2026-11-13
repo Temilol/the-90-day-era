@@ -1,4 +1,4 @@
-import type { DayLog, EraState } from './types'
+import type { DayLog, EraState, ShiftType } from './types'
 import { TOTAL_DAYS, addDays, dayNumber, dateForDay, todayKey, weekOf, chapterOf, parseKey } from './dates'
 import { levelFor } from './xp'
 import { SELF_CARE_IDS } from '@/content/quests'
@@ -35,6 +35,11 @@ export interface Stats {
   journalEntries: number
   nightShiftWorkouts: number
   dayShiftWorkouts: number
+  /** For each kind of day that has happened so far: how many there were and how many had a walk. */
+  byShift: Record<ShiftType, { days: number; walks: number; minutes: number }>
+  /** Calories burned, from typed-in numbers only. Nothing here is estimated. */
+  calories: { total: number; byDate: Record<string, number>; daysWithData: number; walksWithData: number; walkTotal: number; best: { date: string; value: number } | null }
+  otherActivities: number
   bossesDefeated: number
   reflections: number
   purchases: number
@@ -118,6 +123,27 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
   const journalEntries = logs.filter((d) => d.journal && Object.values(d.journal).some((v) => v && v !== d.journal!.updatedAt)).length
   const nightShiftWorkouts = workoutsList.filter((d) => d.shift === 'night').length
   const dayShiftWorkouts = workoutsList.filter((d) => d.shift === 'day').length
+  const byShift: Stats['byShift'] = { day: { days: 0, walks: 0, minutes: 0 }, night: { days: 0, walks: 0, minutes: 0 }, elective: { days: 0, walks: 0, minutes: 0 }, off: { days: 0, walks: 0, minutes: 0 }, recovery: { days: 0, walks: 0, minutes: 0 } }
+  for (const d of logs) {
+    if (!d.shift || d.date > today || !byShift[d.shift]) continue
+    const b = byShift[d.shift]
+    b.days++
+    if (d.workout && d.workout.minutes >= 5) { b.walks++; b.minutes += d.workout.minutes }
+  }
+  const calories: Stats['calories'] = { total: 0, byDate: {}, daysWithData: 0, walksWithData: 0, walkTotal: 0, best: null }
+  let otherActivities = 0
+  for (const d of logs) {
+    const walk = d.workout?.calories && d.workout.calories > 0 ? d.workout.calories : 0
+    const acts = d.activities ?? []
+    otherActivities += acts.length
+    const sum = walk + (d.strength?.calories && d.strength.calories > 0 ? d.strength.calories : 0) + acts.reduce((a, x) => a + (x.calories && x.calories > 0 ? x.calories : 0), 0)
+    if (walk) { calories.walksWithData++; calories.walkTotal += walk }
+    if (sum <= 0) continue
+    calories.byDate[d.date] = sum
+    calories.total += sum
+    calories.daysWithData++
+    if (!calories.best || sum > calories.best.value) calories.best = { date: d.date, value: sum }
+  }
   const bossesDefeated = s.xp.filter((e) => e.id.startsWith('boss:')).length
   const reflections = Object.keys(s.reflections).length
   const envelopesOpened = Object.values(s.envelopes).filter((e) => e.openedAt).length
@@ -159,7 +185,7 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
     daysLogged, daysRemaining: Math.max(0, TOTAL_DAYS - Math.min(currentDay, TOTAL_DAYS)),
     workouts, fullWorkouts, walkingMinutes, strengthSessions, strengthMinutes, recoveryDays,
     streak, bestStreak, lifetimeXp, spentXp, spendableXp, level: levelFor(lifetimeXp),
-    questsCompleted, questCounts, selfCareQuests, journalEntries, nightShiftWorkouts, dayShiftWorkouts,
+    questsCompleted, questCounts, selfCareQuests, journalEntries, nightShiftWorkouts, dayShiftWorkouts, byShift, calories, otherActivities,
     bossesDefeated, reflections, purchases: s.purchases.length, spins: s.spins.length, envelopesOpened,
     comebacks, themesUsed, bonusMissions, weekly, nsvs: s.nsvs.length, weights: s.weights.length, activeDates, frozenDates, freezesLeft, freezesLeftByChapter,
   }

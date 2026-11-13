@@ -1,4 +1,4 @@
-import type { WorkoutKind } from './types'
+import type { ShiftType, WorkoutKind } from './types'
 
 export const LEVELS: { level: number; title: string; xp: number }[] = [
   { level: 1, title: 'Rookie', xp: 0 },
@@ -13,9 +13,10 @@ export const LEVELS: { level: number; title: string; xp: number }[] = [
 
 export const XP = {
   walkShort: 10, // 5-10 min
-  walkMedium: 20, // 11-20 min
-  walkFull: 30, // 21-30 min
-  walkLong: 35, // >30 min
+  walkMedium: 15, // 11-20 min
+  walkFull: 25, // 21-30 min
+  walkLong: 30, // >30 min
+  shiftBonus: 5, // on top of any walk logged on a day or night shift
   strength: 15,
   boss: 25,
   reflection: 10,
@@ -30,6 +31,11 @@ export function walkXp(minutes: number): number {
   if (minutes <= 20) return XP.walkMedium
   if (minutes <= 30) return XP.walkFull
   return XP.walkLong
+}
+
+/** Only the 12-hour day and night shifts earn the bonus. Electives, days off and recovery days don't. */
+export function earnsShiftBonus(shift: ShiftType | undefined): boolean {
+  return shift === 'day' || shift === 'night'
 }
 
 export function walkKind(minutes: number): WorkoutKind {

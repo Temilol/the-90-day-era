@@ -1,9 +1,11 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
-import type { DayLog, EraState, JournalEntry, Reminder, Reward, ShiftType } from '@/lib/types'
+import type { DayLog, EraState, JournalEntry, Reminder, Reward, ShiftHours, ShiftType } from '@/lib/types'
+import { DEFAULT_ELECTIVE } from '@/lib/walkPlan'
+import { planFill, type FillOptions } from '@/lib/schedule'
 import { todayKey, dayNumber, TOTAL_DAYS, weekOf, chapterOf } from '@/lib/dates'
-import { XP, walkXp, walkKind, levelFor } from '@/lib/xp'
+import { XP, walkXp, walkKind, levelFor, earnsShiftBonus } from '@/lib/xp'
 import { computeStats } from '@/lib/stats'
 import { DEFAULT_REWARDS } from '@/content/rewards'
 import { BADGES } from '@/content/badges'
@@ -42,10 +44,16 @@ export function initialState(): EraState {
 export interface Actions {
   setProfile: (p: Partial<EraState['profile']>) => void
   ensureDay: (date: string) => void
-  setShift: (date: string, shift: ShiftType | undefined) => void
+  setShift: (date: string, shift: ShiftType | undefined, hours?: ShiftHours) => void
+  setShiftHours: (date: string, hours: ShiftHours) => void
+  /** Fill a run of dates with a repeating pattern. Returns how many days were changed. */
+  fillShifts: (o: FillOptions) => number
+  setWorkoutCalories: (date: string, calories: number | undefined) => void
+  addActivity: (date: string, a: { name: string; minutes: number; calories?: number }) => void
+  removeActivity: (date: string, id: string) => void
   logWorkout: (date: string, w: { minutes: number; incline: number; speed: number; theme?: string; notes?: string }) => void
   removeWorkout: (date: string) => void
-  logStrength: (date: string, minutes: number, notes?: string) => void
+  logStrength: (date: string, minutes: number, notes?: string, calories?: number) => void
   removeStrength: (date: string) => void
   setRecovery: (date: string, on: boolean) => void
   toggleQuest: (date: string, questId: string) => void
@@ -97,6 +105,26 @@ function revoke(s: EraState, id: string) {
   const i = s.xp.findIndex((e) => e.id === id)
   if (i >= 0) s.xp.splice(i, 1)
 }
+/**
+ * Keeps the shift bonus in step with the day: there when a walk sits on a day or night shift, gone
+ * otherwise. Walks logged under the older, higher walk values keep what they earned and get no bonus on top.
+ * Returns true when the bonus was newly added.
+ */
+function syncShiftBonus(s: EraState, date: string): boolean {
+  const id = `shiftbonus:${date}`
+  const d = s.days[date]
+  const base = s.xp.find((e) => e.id === `workout:${date}`)
+  const had = s.xp.some((e) => e.id === id)
+  revoke(s, id)
+  if (!d?.workout || !base || !earnsShiftBonus(d.shift) || base.amount > walkXp(d.workout.minutes)) return false
+  award(s, id, XP.shiftBonus, `Walked on a ${d.shift} shift`, date)
+  return !had
+}
+const cleanCalories = (n: number | undefined) => (typeof n === 'number' && isFinite(n) && n > 0 ? Math.round(n) : undefined)
+function lastElectiveHours(s: EraState): ShiftHours {
+  const found = Object.values(s.days).filter((d) => d.shift === 'elective' && d.hours).sort((a, b) => b.date.localeCompare(a.date))[0]
+  return found?.hours ? { ...found.hours } : { ...DEFAULT_ELECTIVE }
+}
 function day(s: EraState, date: string): DayLog {
   if (!s.days[date]) s.days[date] = { date, quests: {} }
   if (!s.days[date].quests) s.days[date].quests = {}
@@ -126,11 +154,14 @@ export const useStore = create<Store>()(
 
         setProfile: (p) => set((s) => { Object.assign(s.profile, p) }),
         ensureDay: (date) => set((s) => { day(s, date) }),
-        setShift: (date, shift) => {
+        setShift: (date, shift, hours) => {
           const loggable = shift === 'recovery' && inChallenge(get(), date)
           mutate((s) => {
             const d = day(s, date)
             d.shift = shift
+            if (shift) d.shiftSet = 'me'; else delete d.shiftSet
+            if (shift === 'elective') d.hours = hours ?? d.hours ?? lastElectiveHours(s); else delete d.hours
+            if (syncShiftBonus(s, date)) toast(`+${XP.shiftBonus} XP`, 'Shift bonus for that walk')
             if (loggable && !d.workout && !d.recovery) {
               if (s.freezes[date]) delete s.freezes[date]
               d.recovery = true
@@ -139,28 +170,54 @@ export const useStore = create<Store>()(
           })
         },
 
+        setShiftHours: (date, hours) => set((s) => { const d = day(s, date); if (d.shift === 'elective') { d.hours = hours; d.shiftSet = 'me' } }),
+        fillShifts: (o) => {
+          const plan = planFill(get().days, o).filter((p) => !p.kept && p.shift)
+          if (!plan.length) return 0
+          mutate((s) => {
+            for (const p of plan) {
+              const d = day(s, p.date)
+              d.shift = p.shift
+              d.shiftSet = 'plan'
+              if (p.shift === 'elective') d.hours = { ...(o.hours ?? DEFAULT_ELECTIVE) }; else delete d.hours
+              syncShiftBonus(s, p.date)
+            }
+          })
+          return plan.length
+        },
+        setWorkoutCalories: (date, calories) => set((s) => { const w = s.days[date]?.workout; if (!w) return; const c = cleanCalories(calories); if (c) w.calories = c; else delete w.calories }),
+        addActivity: (date, a) => {
+          if (!inChallenge(get(), date) || !a.name.trim()) return
+          set((s) => { const d = day(s, date); (d.activities ||= []).push({ id: `a${Date.now().toString(36)}`, name: a.name.trim().slice(0, 40), minutes: Math.max(0, Math.round(a.minutes) || 0), calories: cleanCalories(a.calories), loggedAt: new Date().toISOString() }) })
+        },
+        removeActivity: (date, id) => set((s) => { const d = s.days[date]; if (d?.activities) d.activities = d.activities.filter((x) => x.id !== id) }),
+
         logWorkout: (date, w) => {
           if (!inChallenge(get(), date)) return
           const minutes = Math.max(0, Math.round(w.minutes))
           mutate((s) => {
             const d = day(s, date)
-            const prevXp = s.xp.find((e) => e.id === `workout:${date}`)?.amount ?? 0
+            const prevXp = (s.xp.find((e) => e.id === `workout:${date}`)?.amount ?? 0) + (s.xp.find((e) => e.id === `shiftbonus:${date}`)?.amount ?? 0)
             if (s.freezes[date]) delete s.freezes[date]
-            d.workout = { kind: walkKind(minutes), minutes, incline: w.incline, speed: w.speed, theme: w.theme, notes: w.notes, loggedAt: new Date().toISOString() }
+            // Editing keeps the original time, so the walk-plan can learn when you usually walk.
+            d.workout = { kind: walkKind(minutes), minutes, incline: w.incline, speed: w.speed, theme: w.theme, notes: w.notes, calories: d.workout?.calories, loggedAt: d.workout?.loggedAt ?? new Date().toISOString() }
             if (d.recovery) { d.recovery = false; revoke(s, `recovery:${date}`) }
             const xp = walkXp(minutes)
             revoke(s, `workout:${date}`)
-            if (award(s, `workout:${date}`, xp, `${minutes}-minute walk`, date) && xp !== prevXp) toast(`+${xp} XP`, prevXp ? 'Workout updated' : 'Workout logged. Proud of you.')
+            award(s, `workout:${date}`, xp, `${minutes}-minute walk`, date)
+            syncShiftBonus(s, date)
+            const bonus = s.xp.find((e) => e.id === `shiftbonus:${date}`)?.amount ?? 0
+            if (xp + bonus !== prevXp && xp > 0) toast(`+${xp + bonus} XP`, prevXp ? 'Workout updated' : bonus ? `Walk +${xp}, shift bonus +${bonus}. Proud of you.` : 'Workout logged. Proud of you.')
           })
         },
-        removeWorkout: (date) => mutate((s) => { const d = s.days[date]; if (d) { delete d.workout; revoke(s, `workout:${date}`) } }),
+        removeWorkout: (date) => mutate((s) => { const d = s.days[date]; if (d) { delete d.workout; revoke(s, `workout:${date}`); revoke(s, `shiftbonus:${date}`) } }),
 
-        logStrength: (date, minutes, notes) => {
+        logStrength: (date, minutes, notes, calories) => {
           if (!inChallenge(get(), date)) return
           mutate((s) => {
             const d = day(s, date)
             const first = !d.strength
-            d.strength = { minutes, notes, loggedAt: new Date().toISOString() }
+            d.strength = { minutes, notes, calories: cleanCalories(calories), loggedAt: new Date().toISOString() }
             if (first && award(s, `strength:${date}`, XP.strength, 'Strength session', date)) toast(`+${XP.strength} XP`, 'Strength session logged')
           })
         },

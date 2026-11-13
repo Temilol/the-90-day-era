@@ -40,6 +40,7 @@ export const BADGES: BadgeDef[] = [
   { id: 'quests-50', name: 'Quest Collector', emoji: '🗺️', desc: 'Complete 50 daily quests.', group: 'habits', check: (s) => s.questsCompleted >= 50 },
   { id: 'reflect-4', name: 'Deep Thinker', emoji: '🪞', desc: 'Complete 4 weekly reflections.', group: 'habits', check: (s) => s.reflections >= 4 },
   { id: 'recovery-3', name: 'Rest Is Productive', emoji: '🌿', desc: 'Log 3 planned recovery days.', group: 'habits', check: (s) => s.recoveryDays >= 3 },
+  { id: 'shift-warrior', name: 'Shift Warrior', emoji: '🛡️', desc: 'Walk on 20 day-shift or night-shift days.', group: 'workouts', check: (s) => s.dayShiftWorkouts + s.nightShiftWorkouts >= 20 },
   // hidden
   { id: 'night-owl', name: 'Night Owl', emoji: '🦉', desc: 'Complete 5 workouts on night-shift days.', group: 'hidden', hidden: true, check: (s) => s.nightShiftWorkouts >= 5 },
   { id: 'comeback-kid', name: 'Comeback Kid', emoji: '🎯', desc: 'Return with a workout after two or more quiet days.', group: 'hidden', hidden: true, check: (s) => s.comebacks >= 1 },

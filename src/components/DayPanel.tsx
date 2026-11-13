@@ -3,36 +3,120 @@ import { clsx } from 'clsx'
 import { motion } from 'framer-motion'
 import { useStore } from '@/store/useStore'
 import { questsFor, themeFor } from '@/lib/hooks'
-import { walkXp, XP } from '@/lib/xp'
+import { walkXp, XP, earnsShiftBonus } from '@/lib/xp'
+import { DEFAULT_ELECTIVE } from '@/lib/walkPlan'
 import type { ShiftType } from '@/lib/types'
 import { THEMES } from '@/content/themes'
 import { Check, Modal } from './ui'
 import { burst, hearts } from './Celebrate'
 import { tap } from '@/lib/haptics'
-import { Shuffle, Trash2 } from 'lucide-react'
+import { Shuffle, Trash2, Flame, Plus, X } from 'lucide-react'
 import { todayKey, addDays, dayNumber } from '@/lib/dates'
 
-export const SHIFTS: { id: ShiftType; label: string; emoji: string; sub: string }[] = [
-  { id: 'day', label: 'Day shift', emoji: '🌤️', sub: '6 AM – 6 PM' },
-  { id: 'night', label: 'Night shift', emoji: '🌙', sub: '6 PM – 6 AM' },
-  { id: 'off', label: 'Day off', emoji: '🎀', sub: 'Yours entirely' },
-  { id: 'recovery', label: 'Recovery', emoji: '🌿', sub: 'Planned rest' },
+export const SHIFTS: { id: ShiftType; label: string; short: string; emoji: string; sub: string }[] = [
+  { id: 'day', label: 'Day shift', short: 'Day', emoji: '🌤️', sub: '6 AM – 6 PM' },
+  { id: 'night', label: 'Night shift', short: 'Night', emoji: '🌙', sub: '6 PM – 6 AM' },
+  { id: 'elective', label: 'Elective', short: 'Elective', emoji: '📚', sub: 'Your own hours' },
+  { id: 'off', label: 'Day off', short: 'Off', emoji: '🎀', sub: 'Yours entirely' },
+  { id: 'recovery', label: 'Recovery', short: 'Rest', emoji: '🌿', sub: 'Planned rest' },
 ]
 
 export function ShiftPicker({ date, compact }: { date: string; compact?: boolean }) {
   const shift = useStore((s) => s.days[date]?.shift)
   const setShift = useStore((s) => s.setShift)
+  const hours = useStore((s) => s.days[date]?.hours)
+  const setShiftHours = useStore((s) => s.setShiftHours)
+  const h = hours ?? DEFAULT_ELECTIVE
   return (
-    <div className={clsx('grid gap-2', compact ? 'grid-cols-4' : 'grid-cols-2 sm:grid-cols-4')}>
+    <div>
+    <div className={clsx('grid gap-2', compact ? 'grid-cols-5' : 'grid-cols-3 sm:grid-cols-5')}>
       {SHIFTS.map((s) => (
         <button key={s.id} onClick={() => setShift(date, shift === s.id ? undefined : s.id)}
           className={clsx('rounded-2xl border p-3 text-left transition active:scale-[0.98]',
             shift === s.id ? 'border-lavender-400 bg-lavender-50 dark:bg-lavender-500/15 shadow-glow' : 'border-line bg-card-2 hover:border-lavender-200')}>
           <div className="text-xl">{s.emoji}</div>
-          <div className={clsx('font-semibold', compact ? 'text-xs' : 'text-sm')}>{s.label}</div>
+          <div className={clsx('font-semibold', compact ? 'text-[11px] leading-tight' : 'text-sm')}>{compact ? s.short : s.label}</div>
           {!compact && <div className="text-xs text-muted">{s.sub}</div>}
         </button>
       ))}
+    </div>
+    {shift === 'elective' && (
+      <div className="mt-2 flex items-center gap-2 rounded-2xl bg-card-2 p-2.5 text-sm">
+        <span className="text-muted shrink-0 hidden sm:inline">Hours</span>
+        <input type="time" aria-label="Elective start time" className="input !py-1.5 flex-1 min-w-0" value={h.start} onChange={(e) => e.target.value && setShiftHours(date, { ...h, start: e.target.value })} />
+        <span className="text-muted">to</span>
+        <input type="time" aria-label="Elective end time" className="input !py-1.5 flex-1 min-w-0" value={h.end} onChange={(e) => e.target.value && setShiftHours(date, { ...h, end: e.target.value })} />
+      </div>
+    )}
+    </div>
+  )
+}
+
+/** Calories for the walk. Only ever what gets typed here: the app never guesses a number. */
+function WalkCalories({ date, locked }: { date: string; locked?: boolean }) {
+  const saved = useStore((s) => s.days[date]?.workout?.calories)
+  const setCalories = useStore((s) => s.setWorkoutCalories)
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState('')
+  if (saved && !editing) {
+    return (
+      <div className="flex items-center gap-3 rounded-2xl bg-card-2 p-3 text-sm">
+        <Flame size={18} className="text-peach-400 shrink-0" />
+        <div className="flex-1"><span className="font-semibold">{saved} cal</span> <span className="text-muted">burned on this walk</span></div>
+        {!locked && <button className="btn-ghost !py-1 text-xs" onClick={() => { setValue(String(saved)); setEditing(true) }}>Edit</button>}
+      </div>
+    )
+  }
+  if (locked) return null
+  return (
+    <form className="flex items-center gap-2 rounded-2xl bg-card-2 p-2.5" onSubmit={(e) => { e.preventDefault(); setCalories(date, value.trim() ? parseFloat(value) : undefined); setEditing(false); setValue('') }}>
+      <Flame size={18} className="text-peach-400 shrink-0 ml-1" />
+      <input type="number" inputMode="numeric" min={1} max={5000} className="input !py-2 flex-1 min-w-0" placeholder="Calories burned (optional)" aria-label="Calories burned on this walk" value={value} onChange={(e) => setValue(e.target.value)} />
+      <button className="btn-soft !py-2 shrink-0" type="submit" disabled={!editing && !value.trim()}>Save</button>
+    </form>
+  )
+}
+
+const ACTIVITY_IDEAS = ['Bike', 'Run', 'Swim', 'Yoga', 'Class', 'Sport', 'Hike']
+
+/** Anything else you did. Kept for your stats; earns no XP so the challenge stays about the walk. */
+function OtherActivities({ date, locked }: { date: string; locked?: boolean }) {
+  const list = useStore((s) => s.days[date]?.activities)
+  const addActivity = useStore((s) => s.addActivity)
+  const removeActivity = useStore((s) => s.removeActivity)
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [mins, setMins] = useState('30')
+  const [cal, setCal] = useState('')
+  const save = () => {
+    if (!name.trim()) return
+    addActivity(date, { name, minutes: parseFloat(mins) || 0, calories: cal.trim() ? parseFloat(cal) : undefined })
+    setOpen(false); setName(''); setMins('30'); setCal(''); hearts()
+  }
+  return (
+    <div className="space-y-2">
+      {(list ?? []).map((a) => (
+        <div key={a.id} className="flex items-center gap-3 rounded-2xl bg-card-2 p-3 text-sm">
+          <span className="text-lg">🏃‍♀️</span>
+          <div className="flex-1 min-w-0"><div className="font-semibold truncate">{a.name}</div><div className="text-xs text-muted">{a.minutes ? `${a.minutes} min` : 'Logged'}{a.calories ? ` · ${a.calories} cal` : ''}</div></div>
+          {!locked && <button className="btn-ghost p-1.5" onClick={() => removeActivity(date, a.id)} aria-label={`Remove ${a.name}`}><X size={14} /></button>}
+        </div>
+      ))}
+      {!locked && <button className="w-full rounded-2xl border border-dashed border-line p-3 text-sm text-muted hover:text-ink transition flex items-center justify-center gap-2" onClick={() => setOpen(true)}><Plus size={16} /> Log another activity</button>}
+      <Modal open={open} onClose={() => setOpen(false)} title="Other activity">
+        <div className="space-y-4">
+          <p className="text-sm text-muted">A class, a bike ride, a swim. It goes into your stats. It earns no XP, so the challenge stays about the walk.</p>
+          <div><label className="label">What was it?</label>
+            <input className="input" placeholder="Spin class" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} />
+            <div className="flex gap-2 mt-2 flex-wrap">{ACTIVITY_IDEAS.map((n) => <button key={n} type="button" onClick={() => setName(n)} className={clsx('chip', name === n ? 'bg-lavender-500 text-white' : 'bg-card-2 text-muted')}>{n}</button>)}</div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="label">Minutes</label><input type="number" inputMode="numeric" min={0} max={600} className="input" value={mins} onChange={(e) => setMins(e.target.value)} /></div>
+            <div><label className="label">Calories (optional)</label><input type="number" inputMode="numeric" min={1} max={5000} className="input" placeholder="From your watch" value={cal} onChange={(e) => setCal(e.target.value)} /></div>
+          </div>
+          <button className="btn-primary w-full py-3" disabled={!name.trim()} onClick={save}>Save activity</button>
+        </div>
+      </Modal>
     </div>
   )
 }
@@ -52,6 +136,11 @@ export function WorkoutCard({ date, locked }: { date: string; locked?: boolean }
   const [notes, setNotes] = useState('')
   const [strengthOpen, setStrengthOpen] = useState(false)
   const [strengthMin, setStrengthMin] = useState(10)
+  const [strengthCal, setStrengthCal] = useState('')
+  const openStrength = () => { setStrengthMin(d?.strength?.minutes ?? 10); setStrengthCal(d?.strength?.calories ? String(d.strength.calories) : ''); setStrengthOpen(true) }
+  const walkEarned = useStore((s) => s.xp.find((e) => e.id === `workout:${date}`)?.amount ?? 0)
+  const bonusEarned = useStore((s) => s.xp.find((e) => e.id === `shiftbonus:${date}`)?.amount ?? 0)
+  const bonusDay = earnsShiftBonus(d?.shift)
   const theme = themeFor(date, d?.themeOverride)
   const startDate = useStore((s) => s.profile.startDate)
   const yesterdayKey = addDays(date, -1)
@@ -81,8 +170,9 @@ export function WorkoutCard({ date, locked }: { date: string; locked?: boolean }
             <div className={clsx('text-xs font-bold uppercase tracking-[0.2em]', done ? 'text-white/80' : 'text-lavender-500')}>{done ? 'Workout complete' : date === todayKey() ? 'Today’s workout' : 'The walk'}</div>
             <div className="h-display text-2xl mt-1">{done ? `${d!.workout!.minutes} min logged` : 'The Standard'}</div>
             <div className={clsx('text-sm mt-1', done ? 'text-white/85' : 'text-muted')}>
-              {done ? `Incline ${d!.workout!.incline} · ${d!.workout!.speed} mph · +${walkXp(d!.workout!.minutes)} XP` : 'Incline 12 · 3.0 mph · 30 minutes'}
+              {done ? `Incline ${d!.workout!.incline} · ${d!.workout!.speed} mph · +${walkEarned} XP${bonusEarned ? ` walk, +${bonusEarned} shift bonus` : ''}` : 'Incline 12 · 3.0 mph · 30 minutes'}
             </div>
+            {!done && bonusDay && <div className="mt-2 inline-flex chip bg-lavender-500 text-white">🛡️ Shift day: +{XP.shiftBonus} bonus XP</div>}
           </div>
           <motion.div animate={done ? { rotate: [0, -10, 10, 0] } : {}} className="text-4xl">{done ? '🏆' : '🚶‍♀️'}</motion.div>
         </div>
@@ -124,20 +214,23 @@ export function WorkoutCard({ date, locked }: { date: string; locked?: boolean }
               <div className="font-semibold">🌿 {d?.recovery ? 'Recovery day logged' : d?.shift === 'recovery' ? 'You planned rest. Tap to log it' : 'Make this a recovery day'}</div>
               <div className="text-xs text-muted">Planned rest. Keeps your streak. +{XP.recovery} XP</div>
             </button>
-            <button disabled={locked} onClick={() => setStrengthOpen(true)}
+            <button disabled={locked} onClick={openStrength}
               className={clsx('rounded-2xl border p-3 text-left text-sm transition', d?.strength ? 'border-peach-400 bg-peach-300/20' : 'border-line bg-card-2')}>
-              <div className="font-semibold">💪 {d?.strength ? `Strength: ${d.strength.minutes} min` : 'Add strength session'}</div>
+              <div className="font-semibold">💪 {d?.strength ? `Strength: ${d.strength.minutes} min${d.strength.calories ? ` · ${d.strength.calories} cal` : ''}` : 'Add strength session'}</div>
               <div className="text-xs text-muted">Optional 10-minute session. +{XP.strength} XP</div>
             </button>
           </div>
         )}
+        {done && <WalkCalories date={date} locked={locked} />}
         {done && (
-          <button disabled={locked} onClick={() => setStrengthOpen(true)}
+          <button disabled={locked} onClick={openStrength}
             className={clsx('w-full rounded-2xl border p-3 text-left text-sm transition', d?.strength ? 'border-peach-400 bg-peach-300/20' : 'border-line bg-card-2')}>
-            <div className="font-semibold">💪 {d?.strength ? `Strength: ${d.strength.minutes} min logged` : 'Add an optional strength session'}</div>
+            <div className="font-semibold">💪 {d?.strength ? `Strength: ${d.strength.minutes} min logged${d.strength.calories ? ` · ${d.strength.calories} cal` : ''}` : 'Add an optional strength session'}</div>
             <div className="text-xs text-muted">Bodyweight, bands, dumbbells. +{XP.strength} XP</div>
           </button>
         )}
+
+        <OtherActivities date={date} locked={locked} />
 
         <p className="text-xs text-muted leading-relaxed">
           Listen to your body: pain, dizziness, or heavy fatigue means shorten it or rest. A modified walk is a win. Sleep comes first after a night shift.
@@ -147,7 +240,7 @@ export function WorkoutCard({ date, locked }: { date: string; locked?: boolean }
       <Modal open={custom} onClose={() => setCustom(false)} title={done ? 'Edit workout' : 'Log a modified walk'}>
         <div className="space-y-4">
           <div>
-            <div className="flex justify-between"><label className="label">Minutes</label><span className="text-sm font-semibold gradient-text">+{walkXp(minutes)} XP</span></div>
+            <div className="flex justify-between"><label className="label">Minutes</label><span className="text-sm font-semibold gradient-text">+{walkXp(minutes)} XP{bonusDay ? ` +${XP.shiftBonus} shift bonus` : ''}</span></div>
             <input type="range" min={5} max={60} value={minutes} onChange={(e) => setMinutes(+e.target.value)} className="w-full accent-lavender-500" />
             <div className="flex gap-2 mt-2 flex-wrap">{[10, 15, 20, 25, 30, 40].map((m) => <button key={m} onClick={() => setMinutes(m)} className={clsx('chip', minutes === m ? 'bg-lavender-500 text-white' : 'bg-card-2 text-muted')}>{m}</button>)}</div>
             <div className="text-center h-display text-3xl mt-2">{minutes} min</div>
@@ -167,9 +260,10 @@ export function WorkoutCard({ date, locked }: { date: string; locked?: boolean }
           <div><label className="label">Minutes</label>
             <div className="flex gap-2 flex-wrap">{[5, 10, 15, 20, 30].map((m) => <button key={m} onClick={() => setStrengthMin(m)} className={clsx('chip', strengthMin === m ? 'bg-lavender-500 text-white' : 'bg-card-2 text-muted')}>{m} min</button>)}</div>
           </div>
+          <div><label className="label">Calories burned (optional)</label><input type="number" inputMode="numeric" min={1} max={5000} className="input" placeholder="From your watch, if you track it" value={strengthCal} onChange={(e) => setStrengthCal(e.target.value)} /></div>
           <div className="flex gap-2">
             {d?.strength && <button className="btn-danger" onClick={() => { removeStrength(date); setStrengthOpen(false) }}>Remove</button>}
-            <button className="btn-primary flex-1" onClick={() => { logStrength(date, strengthMin); setStrengthOpen(false); hearts() }}>{d?.strength ? 'Update' : 'Log session'}</button>
+            <button className="btn-primary flex-1" onClick={() => { logStrength(date, strengthMin, d?.strength?.notes, strengthCal.trim() ? parseFloat(strengthCal) : undefined); setStrengthOpen(false); hearts() }}>{d?.strength ? 'Update' : 'Log session'}</button>
           </div>
         </div>
       </Modal>
@@ -182,7 +276,7 @@ export function QuestList({ date, locked }: { date: string; locked?: boolean }) 
   const toggleQuest = useStore((s) => s.toggleQuest)
   const completeBonus = useStore((s) => s.completeBonusMission)
   const clearBonus = useStore((s) => s.clearBonusMission)
-  const quests = questsFor(date)
+  const quests = questsFor(date, d?.shift, d?.quests)
   const doneCount = quests.filter((q) => d?.quests?.[q.id]).length
   return (
     <div className="space-y-2">

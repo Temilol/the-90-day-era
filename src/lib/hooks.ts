@@ -4,6 +4,7 @@ import { computeStats } from './stats'
 import { todayKey, seeded, pickN } from './dates'
 import { HYDRATION_QUEST, QUEST_POOL, type Quest } from '@/content/quests'
 import { THEMES } from '@/content/themes'
+import type { ShiftType } from './types'
 import { QUOTES } from '@/content/quotes'
 
 /** Today's date key, re-evaluated every minute so midnight rollover works while the app is open. */
@@ -34,9 +35,32 @@ export function useStats() {
   return useMemo(() => computeStats(useStore.getState(), today), [today, days, xp, purchases, profile, reflections, envelopes, spins, nsvs, weights, freezes])
 }
 
-/** Daily quests for a date: hydration + 3 rotating, deterministic per date. */
-export function questsFor(date: string): Quest[] {
-  return [HYDRATION_QUEST, ...pickN(QUEST_POOL, 3, seeded(`quests:${date}`))]
+/**
+ * Daily quests for a date: hydration + 3 rotating, the same every time you look.
+ * With a shift set, one of the three is drawn from quests that suit that kind of day, the other two
+ * are random, and quests that can't be done on that shift are left out. Quests already ticked off
+ * stay on the list even if the shift changes afterwards.
+ */
+export function questsFor(date: string, shift?: ShiftType, done?: Record<string, string>): Quest[] {
+  let picks: Quest[]
+  if (!shift) {
+    picks = pickN(QUEST_POOL, 3, seeded(`quests:${date}`))
+  } else {
+    const rnd = seeded(`quests:${date}:${shift}`)
+    const fit = pickN(QUEST_POOL.filter((q) => q.fits?.includes(shift)), 1, rnd)
+    const rest = pickN(QUEST_POOL.filter((q) => !fit.includes(q) && !q.avoid?.includes(shift)), 3 - fit.length, rnd)
+    picks = [...fit, ...rest]
+  }
+  if (done) {
+    for (const q of QUEST_POOL) {
+      if (!done[q.id] || picks.includes(q)) continue
+      let slot = -1
+      for (let i = picks.length - 1; i >= 0; i--) if (!done[picks[i].id]) { slot = i; break }
+      if (slot >= 0) picks[slot] = q
+      else picks.push(q)
+    }
+  }
+  return [HYDRATION_QUEST, ...picks]
 }
 
 export function themeFor(date: string, override?: string) {

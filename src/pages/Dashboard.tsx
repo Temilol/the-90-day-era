@@ -13,6 +13,8 @@ import { BADGES } from '@/content/badges'
 import { Card, Progress, Ring, Sparkles, Modal } from '@/components/ui'
 import { burst } from '@/components/Celebrate'
 import { RecapPhotos } from '@/components/Photos'
+import { WalkPlanCard, planSummary } from '@/components/WalkPlan'
+import { SHIFTS } from '@/components/DayPanel'
 import { ArrowRight, Flame, Sparkles as SparkIcon, Swords, Gift, CalendarDays, BookHeart, ShoppingBag, Trophy } from 'lucide-react'
 
 export default function Dashboard() {
@@ -26,17 +28,11 @@ export default function Dashboard() {
   const celebration = useUi((s) => s.celebration)
   const setCelebration = useUi((s) => s.setCelebration)
   const quote = quoteFor(today)
-  const quests = questsFor(today)
+  const quests = questsFor(today, d?.shift, d?.quests)
   const questsDone = quests.filter((q) => d?.quests?.[q.id]).length
   const unopened = Object.values(envelopes).filter((e) => !e.openedAt).length
   const tomorrowKey = addDays(today, 1)
   const tomorrow = useStore((s) => s.days[tomorrowKey])
-  const tomorrowTip: Record<string, string> = {
-    day: 'Day shift. Best windows: a walk before 5 AM if you’re up early, or right after you get home.',
-    night: 'Night shift. Sleep first, then walk after you wake up. The walk doesn’t care what time it is.',
-    off: 'Day off. Pick your favourite theme and take the scenic 30.',
-    recovery: 'Planned recovery. Stretch, hydrate, and log it for +10 XP.',
-  }
 
   // Chapter celebrations, shown once each
   useEffect(() => {
@@ -83,7 +79,7 @@ export default function Dashboard() {
               <div className="flex-1 min-w-0">
                 <div className={`text-xs font-bold uppercase tracking-[0.2em] ${workoutDone ? 'text-white/80' : 'text-lavender-500'}`}>{workoutDone ? 'Mission complete' : restDone ? 'Recovery day' : 'Today’s mission'}</div>
                 <div className="h-display text-xl sm:text-2xl mt-0.5">{workoutDone ? `${d!.workout!.minutes}-minute walk done` : restDone ? 'Rest logged. Proud of you.' : 'Incline 12 · 3 mph · 30 min'}</div>
-                <div className={`text-sm mt-1 ${workoutDone ? 'text-white/85' : 'text-muted'}`}>{questsDone}/{quests.length} daily quests · {d?.shift ? `${d.shift} shift` : 'shift not set'}</div>
+                <div className={`text-sm mt-1 ${workoutDone ? 'text-white/85' : 'text-muted'}`}>{questsDone}/{quests.length} daily quests · {d?.shift ? SHIFTS.find((x) => x.id === d.shift)?.label.toLowerCase() : 'shift not set'}</div>
               </div>
               <ArrowRight className={workoutDone ? 'text-white' : 'text-lavender-400'} />
             </div>
@@ -128,16 +124,18 @@ export default function Dashboard() {
         </Link>
       </div>
 
+      {stats.started && !stats.finished && <WalkPlanCard date={today} setShiftHref="/today" />}
+
       {tomorrow?.shift && !stats.finished && (
         <Card className="!p-4 flex items-start gap-3">
-          <span className="text-2xl">{{ day: '🌤️', night: '🌙', off: '🎀', recovery: '🌿' }[tomorrow.shift]}</span>
-          <div><div className="text-xs font-bold uppercase tracking-[0.2em] text-lavender-500">Tomorrow · {formatDate(tomorrowKey)}</div><div className="text-sm mt-0.5">{tomorrowTip[tomorrow.shift]}</div></div>
+          <span className="text-2xl">{SHIFTS.find((x) => x.id === tomorrow.shift)?.emoji}</span>
+          <div><div className="text-xs font-bold uppercase tracking-[0.2em] text-lavender-500">Tomorrow · {formatDate(tomorrowKey)}</div><div className="text-sm mt-0.5">{planSummary(tomorrow.shift, tomorrow.hours)}</div></div>
         </Card>
       )}
       {!tomorrow?.shift && stats.started && !stats.finished && (
         <Link to="/shifts" className="card !p-4 flex items-center gap-3 hover:shadow-glow transition">
           <span className="text-2xl">📅</span>
-          <div className="flex-1"><div className="text-sm font-semibold">Plan tomorrow</div><div className="text-xs text-muted">Log tomorrow’s shift and the dashboard will suggest a walk window.</div></div>
+          <div className="flex-1"><div className="text-sm font-semibold">Plan tomorrow</div><div className="text-xs text-muted">Fill in your schedule once and every day gets its own walk plan.</div></div>
           <ArrowRight size={16} className="text-lavender-400" />
         </Link>
       )}

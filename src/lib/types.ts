@@ -1,4 +1,6 @@
-export type ShiftType = 'day' | 'night' | 'off' | 'recovery'
+export type ShiftType = 'day' | 'night' | 'off' | 'recovery' | 'elective'
+/** Working hours as 24-hour 'HH:MM'. Only elective days carry their own; day and night shifts are always 6 to 6. */
+export interface ShiftHours { start: string; end: string }
 export type WorkoutKind = 'standard' | 'modified' | 'extended'
 export type Mood = 'amazing' | 'good' | 'okay' | 'tired' | 'rough'
 
@@ -9,14 +11,19 @@ export interface Workout {
   speed: number
   theme?: string
   notes?: string
+  calories?: number // only ever a number the person typed in
   loggedAt: string
 }
 
 export interface StrengthSession {
   minutes: number
+  calories?: number
   notes?: string
   loggedAt: string
 }
+
+/** Any other exercise. Recorded for stats only: it earns no XP and doesn't affect the streak. */
+export interface Activity { id: string; name: string; minutes: number; calories?: number; loggedAt: string }
 
 export interface JournalEntry {
   mood?: Mood
@@ -33,6 +40,9 @@ export interface JournalEntry {
 export interface DayLog {
   date: string // yyyy-mm-dd
   shift?: ShiftType
+  hours?: ShiftHours // elective days only
+  shiftSet?: 'me' | 'plan' // 'plan' = filled in by the schedule form; anything else was set by hand
+  activities?: Activity[]
   workout?: Workout
   strength?: StrengthSession
   recovery?: boolean // planned recovery day
