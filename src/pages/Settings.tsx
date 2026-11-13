@@ -7,6 +7,8 @@ import { todayKey, addDays, formatDate } from '@/lib/dates'
 import { PageHeader, Card, SectionTitle, Modal } from '@/components/ui'
 import { Download, Upload, Moon, Sun, Monitor, Vibrate } from 'lucide-react'
 import { hapticsSupported, tap } from '@/lib/haptics'
+import { AccountPanel } from '@/components/Account'
+import { useSync, syncConfigured, hasLocalBackup, localBackupJson } from '@/store/sync'
 
 export default function SettingsPage() {
   const profile = useStore((s) => s.profile)
@@ -25,6 +27,14 @@ export default function SettingsPage() {
   const [msg, setMsg] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const hasLogs = stats.daysLogged > 0 || stats.lifetimeXp > 0
+  const signedIn = useSync((s) => !!s.userId)
+  const backupAt = hasLocalBackup()
+  const downloadBackup = () => {
+    const json = localBackupJson(); if (!json) return
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' })); a.download = '90-day-era-device-backup.json'; a.click()
+    URL.revokeObjectURL(a.href)
+  }
 
   const doExport = () => {
     const blob = new Blob([exportJson()], { type: 'application/json' })
@@ -43,6 +53,14 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Settings" emoji="⚙️" />
+      <section>
+        <SectionTitle sub={syncConfigured ? 'Sign in to back up your progress and keep your phone and computer in step.' : undefined}>Account & sync</SectionTitle>
+        <Card>
+          <AccountPanel />
+          {backupAt && <button className="text-xs text-muted underline mt-3" onClick={downloadBackup}>Download this device’s replaced copy from {new Date(backupAt).toLocaleString()}</button>}
+        </Card>
+      </section>
+
       <section>
         <SectionTitle>Profile</SectionTitle>
         <Card className="space-y-4">
@@ -82,7 +100,7 @@ export default function SettingsPage() {
       </section>
 
       <section>
-        <SectionTitle sub="Everything lives in this browser. Export regularly, or to move to another device.">Your data</SectionTitle>
+        <SectionTitle sub={signedIn ? 'Synced to your account. Export gives you an extra copy you hold yourself.' : 'Everything lives in this browser. Export regularly, or to move to another device.'}>Your data</SectionTitle>
         <Card className="space-y-3">
           <div className="grid sm:grid-cols-2 gap-2">
             <button className="btn-soft py-3" onClick={doExport}><Download size={16} /> Export backup (.json)</button>
@@ -97,7 +115,7 @@ export default function SettingsPage() {
       <section>
         <SectionTitle>Danger zone</SectionTitle>
         <Card className="flex items-center justify-between gap-3">
-          <div className="text-sm"><div className="font-semibold">Reset everything</div><div className="text-muted text-xs">Deletes all logs, XP, badges, and rewards on this device. Export first.</div></div>
+          <div className="text-sm"><div className="font-semibold">Reset everything</div><div className="text-muted text-xs">{signedIn ? 'Deletes all logs, XP, badges, and rewards on every synced device and in the cloud. Export first.' : 'Deletes all logs, XP, badges, and rewards on this device. Export first.'}</div></div>
           <button className="btn-danger" onClick={() => { setResetText(''); setResetOpen(true) }}>Reset</button>
         </Card>
       </section>

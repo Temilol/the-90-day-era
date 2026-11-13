@@ -8,6 +8,7 @@ import { useUi, applyTheme } from '@/store/ui'
 import { useStore } from '@/store/useStore'
 import { useStats } from '@/lib/hooks'
 import { useReminders } from '@/lib/reminders'
+import { ConflictModal } from './Account'
 
 export const NAV = [
   { to: '/', label: 'Home', icon: Home, end: true },
@@ -110,6 +111,7 @@ export function Layout() {
 
       <Toasts />
       <UnlockModal />
+      <ConflictModal />
     </div>
   )
 }

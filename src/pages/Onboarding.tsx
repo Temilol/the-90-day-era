@@ -4,6 +4,9 @@ import { useStore } from '@/store/useStore'
 import { todayKey, addDays, formatDate } from '@/lib/dates'
 import { Sparkles } from '@/components/ui'
 import { burst } from '@/components/Celebrate'
+import { Modal } from '@/components/ui'
+import { AccountPanel } from '@/components/Account'
+import { useSync, syncConfigured } from '@/store/sync'
 
 export default function Onboarding() {
   const setProfile = useStore((s) => s.setProfile)
@@ -11,6 +14,9 @@ export default function Onboarding() {
   const [start, setStart] = useState(todayKey())
   const [units, setUnits] = useState<'lb' | 'kg'>('lb')
   const [step, setStep] = useState(0)
+  const [account, setAccount] = useState(false)
+  const recovery = useSync((s) => s.recovery)
+  const signedInEmail = useSync((s) => s.email)
 
   const finish = () => {
     setProfile({ name: name.trim(), startDate: start, units, onboarded: true })
@@ -41,6 +47,9 @@ export default function Onboarding() {
                 </div>
               </div>
               <button className="btn-primary w-full py-3" onClick={() => setStep(1)}>Next</button>
+              {syncConfigured && (signedInEmail
+                ? <p className="text-center text-xs text-muted">Signed in as {signedInEmail}. No saved progress found yet, so set up above.</p>
+                : <button className="w-full text-center text-sm text-lavender-600 dark:text-lavender-300 font-medium" onClick={() => setAccount(true)}>Already started on another device? Sign in</button>)}
             </div>
           )}
 
@@ -68,6 +77,9 @@ export default function Onboarding() {
           )}
         </div>
       </motion.div>
+      <Modal open={account || recovery} onClose={() => setAccount(false)} title={recovery ? 'Reset password' : 'Your account'}>
+        <AccountPanel onSignedIn={() => setAccount(false)} />
+      </Modal>
     </div>
   )
 }

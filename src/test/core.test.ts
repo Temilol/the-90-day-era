@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { dayNumber, dateForDay, weekOf, chapterOf, addDays, diffDays, seeded, pickN, todayKey as todayKeyForTest } from '@/lib/dates'
 import { walkXp, levelFor, walkKind } from '@/lib/xp'
 import { computeStats } from '@/lib/stats'
+import { decide, type SyncMeta } from '@/lib/syncLogic'
 import { useStore, initialState } from '@/store/useStore'
 
 describe('dates', () => {
@@ -194,5 +195,36 @@ describe('step 1 fixes', () => {
     s.logWorkout(addDays(today, -1), { minutes: 30, incline: 12, speed: 3 })
     s.setShift(addDays(today, -1), 'recovery')
     expect(useStore.getState().days[addDays(today, -1)].recovery).toBeFalsy()
+  })
+})
+
+describe('sync decisions', () => {
+  const uid = 'u1'
+  const meta = (m: Partial<SyncMeta> = {}): SyncMeta => ({ userId: uid, version: 3, dirty: false, lastSyncedAt: null, ...m })
+  it('uploads when the cloud is empty and this device has data', () => {
+    expect(decide({ uid, meta: meta({ userId: null, version: 0 }), remoteVersion: null, localHasData: true })).toBe('create')
+    expect(decide({ uid, meta: meta({ userId: null, version: 0 }), remoteVersion: null, localHasData: false })).toBe('noop')
+  })
+  it('a fresh device pulls; a device with its own data asks', () => {
+    expect(decide({ uid, meta: meta({ userId: null, version: 0 }), remoteVersion: 5, localHasData: false })).toBe('pull')
+    expect(decide({ uid, meta: meta({ userId: null, version: 0 }), remoteVersion: 5, localHasData: true })).toBe('ask')
+    expect(decide({ uid, meta: meta({ userId: 'someone-else' }), remoteVersion: 3, localHasData: true })).toBe('ask')
+  })
+  it('a known device pushes, pulls, or asks depending on who changed', () => {
+    expect(decide({ uid, meta: meta(), remoteVersion: 3, localHasData: true })).toBe('noop')
+    expect(decide({ uid, meta: meta({ dirty: true }), remoteVersion: 3, localHasData: true })).toBe('push')
+    expect(decide({ uid, meta: meta(), remoteVersion: 4, localHasData: true })).toBe('pull')
+    expect(decide({ uid, meta: meta({ dirty: true }), remoteVersion: 4, localHasData: true })).toBe('ask')
+  })
+  it('snapshot round-trips through applySnapshot without action functions', async () => {
+    const { useStore, initialState, snapshot, applySnapshot } = await import('@/store/useStore')
+    useStore.setState({ ...initialState(), profile: { name: 'T', startDate: '2026-01-01', units: 'lb', onboarded: true } })
+    useStore.getState().logWorkout('2026-01-01', { minutes: 30, incline: 12, speed: 3 })
+    const snap = JSON.parse(JSON.stringify(snapshot()))
+    expect(Object.values(snap).some((v) => typeof v === 'function')).toBe(false)
+    useStore.getState().resetAll()
+    applySnapshot(snap)
+    expect(useStore.getState().days['2026-01-01'].workout?.minutes).toBe(30)
+    expect(typeof useStore.getState().logWorkout).toBe('function')
   })
 })

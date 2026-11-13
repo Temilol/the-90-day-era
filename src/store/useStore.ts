@@ -329,11 +329,21 @@ export const useStore = create<Store>()(
   ),
 )
 
-export function exportJson(): string {
-  const s = useStore.getState()
+/** Just the saved data, without the action functions. */
+export function snapshot(): EraState {
+  const s = useStore.getState() as unknown as Record<string, unknown>
   const out: Record<string, unknown> = {}
-  for (const k of Object.keys(initialState())) out[k] = (s as unknown as Record<string, unknown>)[k]
-  return JSON.stringify({ ...out, exportedAt: new Date().toISOString() }, null, 2)
+  for (const k of Object.keys(initialState())) out[k] = s[k]
+  return out as unknown as EraState
+}
+
+/** Replace all saved data with a copy from elsewhere (cloud sync). Missing fields fall back to defaults. */
+export function applySnapshot(data: Partial<EraState>) {
+  useStore.setState({ ...initialState(), ...data, version: STATE_VERSION })
+}
+
+export function exportJson(): string {
+  return JSON.stringify({ ...snapshot(), exportedAt: new Date().toISOString() }, null, 2)
 }
 
 export function currentWeek(): number {
