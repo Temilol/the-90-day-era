@@ -2,11 +2,13 @@ import type { WorkoutKind } from './types'
 
 export const LEVELS: { level: number; title: string; xp: number }[] = [
   { level: 1, title: 'Rookie', xp: 0 },
-  { level: 2, title: 'Explorer', xp: 100 },
-  { level: 3, title: 'Warrior', xp: 250 },
-  { level: 4, title: 'Champion', xp: 450 },
-  { level: 5, title: 'Elite', xp: 700 },
-  { level: 6, title: 'Legend', xp: 1000 },
+  { level: 2, title: 'Explorer', xp: 150 },
+  { level: 3, title: 'Warrior', xp: 400 },
+  { level: 4, title: 'Champion', xp: 750 },
+  { level: 5, title: 'Elite', xp: 1200 },
+  { level: 6, title: 'Legend', xp: 1800 },
+  { level: 7, title: 'Icon', xp: 2500 },
+  { level: 8, title: 'Era Queen', xp: 3300 },
 ]
 
 export const XP = {

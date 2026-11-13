@@ -32,10 +32,10 @@ export default function XpPage() {
 
       <section>
         <SectionTitle>Level ladder</SectionTitle>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {LEVELS.map((l) => (
             <div key={l.level} className={clsx('card p-3 text-center', stats.level.level === l.level && 'ring-2 ring-lavender-400', stats.lifetimeXp < l.xp && 'opacity-60')}>
-              <div className="text-2xl">{['🌱', '🧭', '⚔️', '🏅', '💎', '🐉'][l.level - 1]}</div>
+              <div className="text-2xl">{['🌱', '🧭', '⚔️', '🏅', '💎', '🐉', '🌟', '👑'][l.level - 1]}</div>
               <div className="font-semibold text-sm">{l.title}</div>
               <div className="text-xs text-muted">{l.xp} XP</div>
             </div>

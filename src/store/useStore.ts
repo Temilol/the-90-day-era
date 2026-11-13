@@ -295,7 +295,11 @@ export const useStore = create<Store>()(
         // backfill budgets on untouched default rewards
         merged.rewards = (merged.rewards || []).map((r) => {
           const def = DEFAULT_REWARDS.find((d) => d.id === r.id)
-          return def && r.budget === undefined && !r.custom ? { ...r, budget: def.budget } : r
+          if (!def || r.custom) return r
+          const out = { ...r }
+          if (out.budget === undefined) out.budget = def.budget
+          if (def.id === 'coffee' && out.name === 'Favorite coffee or drink') { out.name = def.name; out.emoji = def.emoji }
+          return out
         })
         return merged
       },
