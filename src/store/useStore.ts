@@ -27,6 +27,7 @@ export function initialState(): EraState {
     reflections: {},
     weights: [],
     nsvs: [],
+    photos: [],
     reminders: [
       { id: 'r1', label: 'Walk before shift', time: '04:30', shifts: ['day'], enabled: false },
       { id: 'r2', label: 'Walk after waking', time: '15:30', shifts: ['night'], enabled: false },
@@ -64,6 +65,8 @@ export interface Actions {
   openEnvelope: (id: string) => void
   addWeight: (date: string, value: number) => void
   removeWeight: (date: string) => void
+  addPhoto: (date: string, id: string) => void
+  removePhoto: (id: string) => void
   addNsv: (category: string, text: string) => void
   removeNsv: (id: string) => void
   upsertReminder: (r: Reminder) => void
@@ -246,6 +249,8 @@ export const useStore = create<Store>()(
 
         addWeight: (date, value) => set((s) => { s.weights = [...s.weights.filter((w) => w.date !== date), { date, value }].sort((a, b) => a.date.localeCompare(b.date)) }),
         removeWeight: (date) => set((s) => { s.weights = s.weights.filter((w) => w.date !== date) }),
+        addPhoto: (date, id) => set((s) => { s.photos = [...(s.photos ?? []).filter((p) => p.date !== date), { id, date, addedAt: new Date().toISOString() }].sort((a, b) => a.date.localeCompare(b.date)) }),
+        removePhoto: (id) => set((s) => { s.photos = (s.photos ?? []).filter((p) => p.id !== id) }),
         addNsv: (category, text) => mutate((s) => { s.nsvs.unshift({ id: `n${Date.now()}`, date: todayKey(), category, text }) }),
         removeNsv: (id) => set((s) => { s.nsvs = s.nsvs.filter((n) => n.id !== id) }),
         upsertReminder: (r) => set((s) => { const i = s.reminders.findIndex((x) => x.id === r.id); if (i >= 0) s.reminders[i] = r; else s.reminders.push(r) }),
@@ -293,7 +298,7 @@ export const useStore = create<Store>()(
             const data = JSON.parse(raw)
             if (!data || typeof data !== 'object' || !data.profile || !data.days) return { ok: false, error: 'That file doesn’t look like a 90-Day Era export.' }
             const base = initialState()
-            set(() => ({ ...base, ...data, version: STATE_VERSION }))
+            set(() => ({ ...base, ...data, photos: Array.isArray(data.photos) ? data.photos : [], version: STATE_VERSION }))
             return { ok: true }
           } catch {
             return { ok: false, error: 'Could not read that file.' }
@@ -308,6 +313,7 @@ export const useStore = create<Store>()(
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<EraState>
         const merged = { ...current, ...p } as Store
+        if (!Array.isArray(merged.photos)) merged.photos = []
         // backfill budgets on untouched default rewards
         merged.rewards = (merged.rewards || []).map((r) => {
           const def = DEFAULT_REWARDS.find((d) => d.id === r.id)
@@ -339,7 +345,7 @@ export function snapshot(): EraState {
 
 /** Replace all saved data with a copy from elsewhere (cloud sync). Missing fields fall back to defaults. */
 export function applySnapshot(data: Partial<EraState>) {
-  useStore.setState({ ...initialState(), ...data, version: STATE_VERSION })
+  useStore.setState({ ...initialState(), ...data, photos: Array.isArray(data.photos) ? data.photos : [], version: STATE_VERSION })
 }
 
 export function exportJson(): string {

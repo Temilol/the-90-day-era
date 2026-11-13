@@ -12,6 +12,7 @@ import { THEMES } from '@/content/themes'
 import { BADGES } from '@/content/badges'
 import { Card, Progress, Ring, Sparkles, Modal } from '@/components/ui'
 import { burst } from '@/components/Celebrate'
+import { RecapPhotos } from '@/components/Photos'
 import { ArrowRight, Flame, Sparkles as SparkIcon, Swords, Gift, CalendarDays, BookHeart, ShoppingBag, Trophy } from 'lucide-react'
 
 export default function Dashboard() {
@@ -181,6 +182,7 @@ export default function Dashboard() {
                   <div key={l as string} className="rounded-2xl bg-card-2 p-2.5"><div className="text-lg leading-none">{e}</div><div className="h-display text-xl mt-1">{v}</div><div className="text-[11px] text-muted">{l}</div></div>
                 ))}
               </div>
+              {stats.startDate && <RecapPhotos upTo={dateForDay(stats.startDate, c.to)} />}
               {(cs.badges.length > 0 || fav) && (
                 <div className="mt-4 text-sm text-muted space-y-1">
                   {fav && <div>Favourite theme: <span className="text-ink font-medium">{fav.emoji} {fav.name}</span></div>}

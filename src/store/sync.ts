@@ -14,6 +14,8 @@ export const syncConfigured = !!(SUPABASE_URL && SUPABASE_KEY)
 export const EMAIL_CODES = import.meta.env.VITE_AUTH_EMAIL_CODES === 'true'
 
 const TABLE = 'era_state'
+/** Private storage bucket for progress photos. Each person's files sit in a folder named after their user id. */
+export const PHOTO_BUCKET = 'progress-photos'
 const META_KEY = 'era-sync'
 const BACKUP_KEY = 'era-data-backup'
 
@@ -57,6 +59,7 @@ function writeMeta(patch: Partial<SyncMeta>) {
 }
 
 let client: SupabaseClient | null = null
+export const getClient = () => client
 let applying = false // true while cloud data is being written into the local store
 let changeCounter = 0
 let pushTimer: ReturnType<typeof setTimeout> | null = null
@@ -294,7 +297,17 @@ export const useSync = create<SyncState>()((set, get) => {
       return { ok: true, message: 'Password changed.' }
     },
     deleteAccount: async () => {
-      if (!client || !get().userId) return { ok: false, message: 'You need to be signed in.' }
+      const uid = get().userId
+      if (!client || !uid) return { ok: false, message: 'You need to be signed in.' }
+      // Photos are files, not rows, so they have to be removed before the account goes.
+      try {
+        for (let i = 0; i < 20; i++) {
+          const { data: files } = await client.storage.from(PHOTO_BUCKET).list(uid, { limit: 100 })
+          if (!files || files.length === 0) break
+          const { error: removeError } = await client.storage.from(PHOTO_BUCKET).remove(files.map((f) => `${uid}/${f.name}`))
+          if (removeError) break
+        }
+      } catch { /* no photo storage, or offline: the account deletion below reports real problems */ }
       const { error } = await client.rpc('delete_my_account')
       if (error) {
         if (error.code === 'PGRST202' || /could not find the function/i.test(error.message)) return { ok: false, message: 'Account deletion isn’t set up on the server yet.' }

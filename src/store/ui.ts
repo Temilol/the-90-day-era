@@ -10,6 +10,8 @@ interface UiState {
   setTheme: (t: Theme) => void
   haptics: boolean
   setHaptics: (on: boolean) => void
+  blurPhotos: boolean
+  setBlurPhotos: (on: boolean) => void
   toasts: Toast[]
   pushToast: (t: Omit<Toast, 'id'>) => void
   dismissToast: (id: number) => void
@@ -28,6 +30,8 @@ export const useUi = create<UiState>()(
       setTheme: (theme) => set({ theme }),
       haptics: true,
       setHaptics: (haptics) => set({ haptics }),
+      blurPhotos: true,
+      setBlurPhotos: (blurPhotos) => set({ blurPhotos }),
       toasts: [],
       pushToast: (t) => {
         const id = ++toastId
@@ -41,7 +45,7 @@ export const useUi = create<UiState>()(
       celebration: null,
       setCelebration: (celebration) => set({ celebration }),
     }),
-    { name: 'era-ui', partialize: (s) => ({ theme: s.theme, haptics: s.haptics }) },
+    { name: 'era-ui', partialize: (s) => ({ theme: s.theme, haptics: s.haptics, blurPhotos: s.blurPhotos }) },
   ),
 )
 

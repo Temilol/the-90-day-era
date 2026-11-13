@@ -228,3 +228,34 @@ describe('sync decisions', () => {
     expect(typeof useStore.getState().logWorkout).toBe('function')
   })
 })
+
+describe('progress photos', () => {
+  it('keeps one photo per date, oldest first, and survives a round trip', async () => {
+    const { snapshot, applySnapshot } = await import('@/store/useStore')
+    useStore.setState({ ...initialState() })
+    const s = useStore.getState()
+    s.addPhoto('2026-01-10', 'b')
+    s.addPhoto('2026-01-03', 'a')
+    s.addPhoto('2026-01-10', 'c') // replaces b
+    expect(useStore.getState().photos.map((p) => p.id)).toEqual(['a', 'c'])
+    s.removePhoto('a')
+    expect(useStore.getState().photos.map((p) => p.date)).toEqual(['2026-01-10'])
+    const snap = JSON.parse(JSON.stringify(snapshot()))
+    applySnapshot({ ...snap, photos: undefined }) // data saved before photos existed
+    expect(useStore.getState().photos).toEqual([])
+    applySnapshot(snap)
+    expect(useStore.getState().photos[0].id).toBe('c')
+  })
+  it('writes a readable zip', async () => {
+    const { crc32, makeZip } = await import('@/lib/zip')
+    const enc = new TextEncoder()
+    expect(crc32(enc.encode('123456789'))).toBe(0xcbf43926)
+    const zip = makeZip([{ name: '2026-01-03.jpg', data: enc.encode('one') }, { name: '2026-01-10.jpg', data: enc.encode('second') }])
+    const view = new DataView(zip.buffer)
+    expect(view.getUint32(0, true)).toBe(0x04034b50)
+    const end = zip.length - 22
+    expect(view.getUint32(end, true)).toBe(0x06054b50)
+    expect(view.getUint16(end + 10, true)).toBe(2)
+    expect(view.getUint32(view.getUint32(end + 16, true), true)).toBe(0x02014b50)
+  })
+})

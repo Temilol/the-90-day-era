@@ -79,6 +79,8 @@ export interface Envelope {
 }
 
 export interface WeightEntry { date: string; value: number }
+/** A progress photo. The picture itself is stored separately; this is just its label. */
+export interface ProgressPhoto { id: string; date: string; addedAt: string }
 export interface NSV { id: string; date: string; category: string; text: string }
 export interface Reminder { id: string; label: string; time: string; shifts: ShiftType[]; enabled: boolean }
 export interface Spin { at: string; category: string; result: string }
@@ -96,6 +98,7 @@ export interface EraState {
   reflections: Record<number, { text: string; at: string }>
   weights: WeightEntry[]
   nsvs: NSV[]
+  photos: ProgressPhoto[] // at most one per date, oldest first
   reminders: Reminder[]
   spins: Spin[]
   celebrations: Record<string, string>

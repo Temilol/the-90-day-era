@@ -5,7 +5,8 @@ import { useUi, type Theme } from '@/store/ui'
 import { useStats } from '@/lib/hooks'
 import { todayKey, addDays, formatDate } from '@/lib/dates'
 import { PageHeader, Card, SectionTitle, Modal } from '@/components/ui'
-import { Download, Upload, Moon, Sun, Monitor, Vibrate } from 'lucide-react'
+import { Download, Upload, Moon, Sun, Monitor, Vibrate, EyeOff, Images } from 'lucide-react'
+import { downloadAllPhotos } from '@/store/photos'
 import { hapticsSupported, tap } from '@/lib/haptics'
 import { AccountPanel } from '@/components/Account'
 import { useSync, syncConfigured, hasLocalBackup, localBackupJson } from '@/store/sync'
@@ -19,6 +20,16 @@ export default function SettingsPage() {
   const setTheme = useUi((s) => s.setTheme)
   const haptics = useUi((s) => s.haptics)
   const setHaptics = useUi((s) => s.setHaptics)
+  const blurPhotos = useUi((s) => s.blurPhotos)
+  const setBlurPhotos = useUi((s) => s.setBlurPhotos)
+  const photoCount = useStore((s) => s.photos.length)
+  const [zipping, setZipping] = useState(false)
+  const savePhotos = async () => {
+    setZipping(true); setMsg(null)
+    const r = await downloadAllPhotos().catch(() => null)
+    setZipping(false)
+    setMsg(!r || r.saved === 0 ? 'Your photos couldn’t be fetched. Check your connection and try again.' : r.missed ? `Saved ${r.saved} ${r.saved === 1 ? 'photo' : 'photos'}. ${r.missed} couldn’t be fetched right now.` : `Saved ${r.saved} ${r.saved === 1 ? 'photo' : 'photos'}.`)
+  }
   const stats = useStats()
   const [name, setName] = useState(profile.name)
   const [start, setStart] = useState(profile.startDate ?? todayKey())
@@ -100,6 +111,14 @@ export default function SettingsPage() {
       </section>
 
       <section>
+        <SectionTitle>Privacy</SectionTitle>
+        <Card className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 text-sm"><EyeOff size={18} className="text-lavender-500" /><div><div className="font-semibold">Blur progress photos</div><div className="text-xs text-muted">Photos stay blurred in lists until you tap one, in case someone glances at your screen.</div></div></div>
+          <button role="switch" aria-checked={blurPhotos} aria-label="Blur progress photos" onClick={() => setBlurPhotos(!blurPhotos)} className={clsx('w-11 h-6 rounded-full relative transition shrink-0', blurPhotos ? 'bg-gradient-to-r from-lavender-500 to-blush-400' : 'bg-line')}><span className={clsx('absolute top-0.5 size-5 rounded-full bg-white shadow transition', blurPhotos ? 'left-5.5' : 'left-0.5')} /></button>
+        </Card>
+      </section>
+
+      <section>
         <SectionTitle sub={signedIn ? 'Synced to your account. Export gives you an extra copy you hold yourself.' : 'Everything lives in this browser. Export regularly, or to move to another device.'}>Your data</SectionTitle>
         <Card className="space-y-3">
           <div className="grid sm:grid-cols-2 gap-2">
@@ -107,6 +126,8 @@ export default function SettingsPage() {
             <button className="btn-soft py-3" onClick={() => fileRef.current?.click()}><Upload size={16} /> Import backup</button>
             <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) doImport(f); e.target.value = '' }} />
           </div>
+          {photoCount > 0 && <button className="btn-soft py-3 w-full" disabled={zipping} onClick={() => void savePhotos()}><Images size={16} /> {zipping ? 'Gathering photos…' : `Download my photos (${photoCount}, .zip)`}</button>}
+          {photoCount > 0 && <div className="text-xs text-muted">The backup file holds your logs but not your photos. Download those separately.</div>}
           {msg && <div className="text-sm text-lavender-600 dark:text-lavender-300">{msg}</div>}
           <div className="text-xs text-muted">{stats.daysLogged} active days · {stats.lifetimeXp} lifetime XP · {Object.keys(useStore.getState().badges).length} badges</div>
         </Card>
@@ -115,7 +136,7 @@ export default function SettingsPage() {
       <section>
         <SectionTitle>Danger zone</SectionTitle>
         <Card className="flex items-center justify-between gap-3">
-          <div className="text-sm"><div className="font-semibold">Reset everything</div><div className="text-muted text-xs">{signedIn ? 'Deletes all logs, XP, badges, and rewards on every synced device and in the cloud. Export first.' : 'Deletes all logs, XP, badges, and rewards on this device. Export first.'}</div></div>
+          <div className="text-sm"><div className="font-semibold">Reset everything</div><div className="text-muted text-xs">{signedIn ? 'Deletes all logs, XP, badges, rewards, and photos on every synced device and in the cloud. Export first.' : 'Deletes all logs, XP, badges, rewards, and photos on this device. Export first.'}</div></div>
           <button className="btn-danger" onClick={() => { setResetText(''); setResetOpen(true) }}>Reset</button>
         </Card>
       </section>
