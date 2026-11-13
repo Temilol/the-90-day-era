@@ -289,6 +289,16 @@ export const useStore = create<Store>()(
     {
       name: 'era-data',
       version: STATE_VERSION,
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<EraState>
+        const merged = { ...current, ...p } as Store
+        // backfill budgets on untouched default rewards
+        merged.rewards = (merged.rewards || []).map((r) => {
+          const def = DEFAULT_REWARDS.find((d) => d.id === r.id)
+          return def && r.budget === undefined && !r.custom ? { ...r, budget: def.budget } : r
+        })
+        return merged
+      },
       partialize: (s) => {
         const { setProfile: _a, ...rest } = s as unknown as Record<string, unknown>
         const out: Record<string, unknown> = {}

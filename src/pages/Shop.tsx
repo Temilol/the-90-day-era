@@ -24,7 +24,7 @@ export default function Shop() {
   const fileRef = useRef<HTMLInputElement>(null)
   const save = () => {
     if (!edit?.name?.trim() || !edit.cost || edit.cost <= 0) return
-    const fields = { name: edit.name.trim(), cost: Math.round(edit.cost), emoji: edit.emoji || '🎁', image: edit.image, link: edit.link?.trim() || undefined, note: edit.note?.trim() || undefined }
+    const fields = { name: edit.name.trim(), cost: Math.round(edit.cost), emoji: edit.emoji || '🎁', image: edit.image, budget: edit.budget && edit.budget > 0 ? Math.round(edit.budget) : undefined, link: edit.link?.trim() || undefined, note: edit.note?.trim() || undefined }
     if (edit.id) updateReward(edit.id, fields)
     else addReward(fields)
     setEdit(null)
@@ -59,7 +59,7 @@ export default function Shop() {
               {!r.image && <div className="size-14 rounded-2xl grid place-items-center text-3xl bg-gradient-to-br from-lavender-100 to-blush-100 dark:from-lavender-500/30 dark:to-blush-500/20">{r.emoji}</div>}
               <div className="flex-1 min-w-0">
                 <div className="font-semibold leading-tight line-clamp-2">{r.image && <span className="mr-1">{r.emoji}</span>}{r.name}</div>
-                <div className="text-xs text-muted">{r.cost} XP{owned ? ` · unlocked ×${owned}` : ''}{!can && ` · about ${walksAway(r.cost - stats.spendableXp)} more walk${walksAway(r.cost - stats.spendableXp) === 1 ? '' : 's'}`}</div>
+                <div className="text-xs text-muted">{r.cost} XP{r.budget ? ` · up to $${r.budget}` : ''}{owned ? ` · unlocked ×${owned}` : ''}{!can && ` · about ${walksAway(r.cost - stats.spendableXp)} more walk${walksAway(r.cost - stats.spendableXp) === 1 ? '' : 's'}`}</div>
                 {r.note && <div className="text-xs text-muted italic truncate mt-0.5">{r.note}</div>}
                 {r.link && <a href={r.link} target="_blank" rel="noreferrer" className="text-xs text-lavender-600 dark:text-lavender-300 font-medium inline-flex items-center gap-1 mt-0.5"><ExternalLink size={11} /> Open link</a>}
                 {!can && <Progress value={stats.spendableXp / r.cost} className="mt-2" height="h-1.5" />}
@@ -84,7 +84,7 @@ export default function Shop() {
             {[...purchases].reverse().map((p) => (
               <button key={p.id} onClick={() => redeem(p.id)} className={clsx('card w-full p-3 flex items-center gap-3 text-left', p.redeemed && 'opacity-60')}>
                 <span className="text-2xl">{rewards.find((r) => r.id === p.rewardId)?.emoji ?? '🎁'}</span>
-                <div className="flex-1"><div className={clsx('font-medium', p.redeemed && 'line-through')}>{p.name}</div><div className="text-xs text-muted">{p.cost} XP · {new Date(p.at).toLocaleDateString()}{p.redeemed ? ' · enjoyed ✓' : ' · tap when enjoyed'}</div></div>
+                <div className="flex-1"><div className={clsx('font-medium', p.redeemed && 'line-through')}>{p.name}</div><div className="text-xs text-muted">{p.cost} XP{rewards.find((r) => r.id === p.rewardId)?.budget ? ` · up to $${rewards.find((r) => r.id === p.rewardId)!.budget}` : ''} · {new Date(p.at).toLocaleDateString()}{p.redeemed ? ' · enjoyed ✓' : ' · tap when enjoyed'}</div></div>
               </button>
             ))}
           </div>
@@ -98,8 +98,11 @@ export default function Shop() {
               <div><label className="label">Icon</label><input className="input text-center text-xl" value={edit.emoji || ''} onChange={(e) => setEdit({ ...edit, emoji: e.target.value.slice(0, 4) })} /></div>
               <div><label className="label">Reward</label><input className="input" placeholder="A new book, a nail appointment…" value={edit.name || ''} onChange={(e) => setEdit({ ...edit, name: e.target.value })} autoFocus /></div>
             </div>
-            <div><label className="label">Cost (XP)</label><input type="number" min={5} step={5} className="input" value={edit.cost ?? ''} onChange={(e) => setEdit({ ...edit, cost: +e.target.value })} />
-              {!!edit.cost && edit.cost > 0 && <div className="text-xs text-muted mt-1">About {walksAway(edit.cost)} standard walks from zero.</div>}</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="label">Cost (XP)</label><input type="number" min={5} step={5} className="input" value={edit.cost ?? ''} onChange={(e) => setEdit({ ...edit, cost: +e.target.value })} /></div>
+              <div><label className="label">Budget cap ($)</label><input type="number" min={0} step={5} className="input" placeholder="optional" value={edit.budget ?? ''} onChange={(e) => setEdit({ ...edit, budget: e.target.value === '' ? undefined : +e.target.value })} /></div>
+            </div>
+            {!!edit.cost && edit.cost > 0 && <div className="text-xs text-muted -mt-1">About {walksAway(edit.cost)} standard walks from zero.{edit.budget ? ` Spend up to $${edit.budget} when you unlock it.` : ''}</div>}
             <div>
               <label className="label">Wishlist photo (optional)</label>
               {edit.image ? (
@@ -122,6 +125,7 @@ export default function Shop() {
             <div className="text-5xl">{confirmBuy.emoji}</div>
             <div className="h-display text-xl mt-2">{confirmBuy.name}</div>
             <div className="text-muted text-sm mt-1">Spend {confirmBuy.cost} XP. You’ll have {stats.spendableXp - confirmBuy.cost} XP left. Level stays the same.</div>
+            {confirmBuy.budget && <div className="chip bg-gold-300/50 text-ink mt-3">Budget: up to ${confirmBuy.budget}</div>}
             <button className="btn-primary w-full mt-5" onClick={() => { if (buy(confirmBuy.id)) burst({ big: true }); setConfirmBuy(null) }}>Treat myself</button>
           </div>
         )}

@@ -57,6 +57,7 @@ export interface Reward {
   emoji: string
   custom?: boolean
   image?: string // small data URL
+  budget?: number // optional spending cap in your currency
   link?: string
   note?: string
 }
