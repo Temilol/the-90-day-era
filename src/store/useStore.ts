@@ -185,7 +185,7 @@ export const useStore = create<Store>()(
           })
         },
 
-        setBonusMission: (date, text, source) => set((s) => { day(s, date).bonusMission = { text, source } }),
+        setBonusMission: (date, text, source) => set((s) => { const d = day(s, date); if (d.bonusMission?.done) return; d.bonusMission = { text, source } }),
         completeBonusMission: (date) => mutate((s) => {
           const d = day(s, date)
           if (!d.bonusMission || d.bonusMission.done) return

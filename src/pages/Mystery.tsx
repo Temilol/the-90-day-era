@@ -9,6 +9,7 @@ import { THEMES } from '@/content/themes'
 import { PageHeader, SectionTitle, Card, Modal } from '@/components/ui'
 import { burst, hearts } from '@/components/Celebrate'
 import { XP } from '@/lib/xp'
+import { addDays, dayNumber, TOTAL_DAYS } from '@/lib/dates'
 
 export default function Mystery() {
   const stats = useStats()
@@ -27,7 +28,7 @@ export default function Mystery() {
   const category = WHEEL.find((c) => c.id === cat)!
   const spin = () => {
     if (spinning) return
-    setSpinning(true); setResult(null)
+    setSpinning(true); setResult(null); setAdopted(null)
     const idx = Math.floor(Math.random() * category.items.length)
     const seg = 360 / category.items.length
     const target = 360 * 5 + (360 - (idx * seg + seg / 2))
@@ -44,7 +45,20 @@ export default function Mystery() {
     setOpening(id)
     setTimeout(() => { openEnvelope(id); setOpening(null); setRevealed(id); burst({ big: true }) }, 1100)
   }
-  const canAdopt = stats.started && !stats.finished && !todayLog?.bonusMission
+  const active = stats.started && !stats.finished
+  const todayBonus = todayLog?.bonusMission
+  const todayDone = !!todayBonus?.done
+  const tomorrowKey = addDays(stats.today, 1)
+  const tomorrowBonus = useStore((s) => s.days[tomorrowKey]?.bonusMission)
+  const tomorrowInChallenge = !!stats.startDate && dayNumber(stats.startDate, tomorrowKey) <= TOTAL_DAYS
+  const [adopted, setAdopted] = useState<string | null>(null)
+  // What a spin result can become right now.
+  const target: { date: string; label: string; done: string } | null = !active ? null
+    : !todayBonus ? { date: stats.today, label: `Make it today’s bonus mission (+${XP.bonusMission} XP)`, done: 'Added to Today’s Mission' }
+    : !todayDone ? { date: stats.today, label: 'Swap today’s bonus mission for this one', done: 'Today’s bonus mission swapped' }
+    : !tomorrowInChallenge ? null
+    : !tomorrowBonus ? { date: tomorrowKey, label: `Save it as tomorrow’s bonus mission (+${XP.bonusMission} XP)`, done: 'Saved for tomorrow' }
+    : { date: tomorrowKey, label: 'Replace tomorrow’s bonus mission with this one', done: 'Tomorrow’s bonus mission replaced' }
 
   return (
     <div className="space-y-8">
@@ -74,7 +88,7 @@ export default function Mystery() {
       </section>
 
       <section>
-        <SectionTitle sub="Pick a category, spin, and optionally adopt the result as today’s bonus mission (+10 XP).">Spin the wheel</SectionTitle>
+        <SectionTitle sub="Pick a category and spin. One result a day can become your bonus mission for +10 XP.">Spin the wheel</SectionTitle>
         <Card>
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
             {WHEEL.map((c) => <button key={c.id} disabled={spinning} onClick={() => { setCat(c.id); setResult(null) }} className={clsx('chip shrink-0 py-1.5 px-3', cat === c.id ? 'text-white' : 'bg-card-2 text-muted')} style={cat === c.id ? { background: c.color } : {}}>{c.emoji} {c.name}</button>)}
@@ -89,14 +103,22 @@ export default function Mystery() {
             </motion.div>
             <div className="absolute inset-0 m-auto size-16 rounded-full bg-card shadow-soft grid place-items-center text-2xl">{spinning ? '✨' : category.emoji}</div>
           </div>
-          <button className="btn-primary w-full py-3" disabled={spinning} onClick={spin}>{spinning ? 'Spinning…' : 'Spin'}</button>
+          {active && todayBonus && (
+            <div className="mb-3 rounded-2xl bg-card-2 p-3 text-sm">
+              {todayDone
+                ? <><span className="font-semibold">Today’s bonus is done ✓</span> <span className="text-muted">One bonus earns XP per day. {tomorrowInChallenge ? (tomorrowBonus ? `Tomorrow’s is lined up: “${tomorrowBonus.text}”. Spin to replace it, or just for fun.` : 'Spin now to line one up for tomorrow.') : ''}</span></>
+                : <><span className="font-semibold">Today’s bonus:</span> <span className="text-muted">“{todayBonus.text}”. Spin to swap it for something else.</span></>}
+            </div>
+          )}
+          <button className="btn-primary w-full py-3" disabled={spinning} onClick={spin}>{spinning ? 'Spinning…' : todayDone && tomorrowInChallenge ? 'Spin for tomorrow' : 'Spin'}</button>
           <AnimatePresence>
             {result && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 rounded-2xl bg-gradient-to-br from-lavender-50 to-blush-50 dark:from-lavender-500/15 dark:to-blush-500/10 p-4 text-center">
                 <div className="text-xs font-bold uppercase tracking-[0.2em] text-lavender-500">{result.category}</div>
                 <div className="h-display text-xl mt-1">{result.text}</div>
-                {canAdopt ? <button className="btn-soft mt-3" onClick={() => { setBonus(stats.today, result.text, result.category); hearts() }}>Make it today’s bonus mission (+{XP.bonusMission} XP)</button>
-                  : <div className="text-xs text-muted mt-2">{todayLog?.bonusMission ? 'You already have a bonus mission today. Finish or skip it on Today’s Mission.' : 'Bonus missions unlock once your challenge starts.'}</div>}
+                {adopted ? <div className="text-sm font-semibold gradient-text mt-3">{adopted} ✓</div>
+                  : target ? <button className="btn-soft mt-3" onClick={() => { setBonus(target.date, result.text, result.category); setAdopted(target.done); hearts() }}>{target.label}</button>
+                  : <div className="text-xs text-muted mt-2">{!active ? 'Bonus missions unlock once your challenge starts.' : 'Today’s bonus is done and tomorrow is past Day 90, so this one is just for fun.'}</div>}
               </motion.div>
             )}
           </AnimatePresence>

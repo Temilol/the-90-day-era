@@ -47,7 +47,7 @@ export default function Today() {
       </section>
 
       <section>
-        <SectionTitle sub="Small habits, bonus XP. Tap to check off." action={<Link to="/mystery" className="btn-soft !py-1.5 text-xs"><Gift size={14} /> Spin for a bonus</Link>}>3. Daily quests</SectionTitle>
+        <SectionTitle sub="Small habits, bonus XP. Tap to check off." action={<Link to="/mystery" className="btn-soft !py-1.5 text-xs"><Gift size={14} /> {d?.bonusMission?.done ? 'Spin for tomorrow' : d?.bonusMission ? 'Swap bonus' : 'Spin for a bonus'}</Link>}>3. Daily quests</SectionTitle>
         <QuestList date={today} />
       </section>
 
