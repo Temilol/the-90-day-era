@@ -10,11 +10,14 @@ import type { EraState } from '@/lib/types'
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 export const syncConfigured = !!(SUPABASE_URL && SUPABASE_KEY)
+/** Emails carry a code to type in, instead of a link. Needs custom email templates in Supabase. */
+export const EMAIL_CODES = import.meta.env.VITE_AUTH_EMAIL_CODES === 'true'
 
 const TABLE = 'era_state'
 const META_KEY = 'era-sync'
 const BACKUP_KEY = 'era-data-backup'
 
+export interface AuthResult { ok: boolean; message?: string; step?: 'code' | 'link' }
 export type SyncStatus = 'signed-out' | 'syncing' | 'synced' | 'pending' | 'offline' | 'error'
 export interface Conflict { remote: EraState; remoteVersion: number; remoteUpdatedAt: string }
 
@@ -27,13 +30,15 @@ interface SyncState {
   lastSyncedAt: string | null
   conflict: Conflict | null
   recovery: boolean // arrived from a password-reset email
-  signUp: (email: string, password: string) => Promise<{ ok: boolean; message?: string; step?: 'code' }>
-  signIn: (email: string, password: string) => Promise<{ ok: boolean; message?: string; step?: 'code' }>
-  verifySignup: (email: string, code: string) => Promise<{ ok: boolean; message?: string; step?: 'code' }>
-  resendCode: (email: string, kind: 'signup' | 'reset') => Promise<{ ok: boolean; message?: string; step?: 'code' }>
-  resetWithCode: (email: string, code: string, password: string) => Promise<{ ok: boolean; message?: string; step?: 'code' }>
+  arrivedFrom: 'signup' | null // arrived from a confirmation email link
+  dismissArrival: () => void
+  signUp: (email: string, password: string) => Promise<AuthResult>
+  signIn: (email: string, password: string) => Promise<AuthResult>
+  verifySignup: (email: string, code: string) => Promise<AuthResult>
+  resendCode: (email: string, kind: 'signup' | 'reset') => Promise<AuthResult>
+  resetWithCode: (email: string, code: string, password: string) => Promise<AuthResult>
   signOut: () => Promise<void>
-  sendReset: (email: string) => Promise<{ ok: boolean; message?: string; step?: 'code' }>
+  sendReset: (email: string) => Promise<AuthResult>
   setNewPassword: (password: string) => Promise<{ ok: boolean; message?: string }>
   changePassword: (current: string, next: string) => Promise<{ ok: boolean; message?: string }>
   deleteAccount: () => Promise<{ ok: boolean; message?: string }>
@@ -74,6 +79,18 @@ function friendly(message: string | undefined): string {
   return message || 'Something went wrong.'
 }
 const isNetwork = (message: string | undefined) => /failed to fetch|network|load failed/i.test(message || '')
+
+/** Which kind of email link (if any) opened this page. Read before Supabase clears it from the address. */
+function readArrival(): 'recovery' | 'signup' | null {
+  try {
+    const raw = `${window.location.hash}&${window.location.search}`
+    if (/error_code=otp_expired|error=access_denied/.test(raw)) return 'recovery' // shows the 'link expired' page
+    if (/type=recovery/.test(raw)) return 'recovery'
+    if (/type=signup/.test(raw)) return 'signup'
+  } catch { /* not in a browser */ }
+  return null
+}
+const arrival = readArrival()
 
 export const useSync = create<SyncState>()((set, get) => {
   const fail = (message: string | undefined) => {
@@ -195,7 +212,9 @@ export const useSync = create<SyncState>()((set, get) => {
     error: null,
     lastSyncedAt: readMeta().lastSyncedAt,
     conflict: null,
-    recovery: false,
+    recovery: arrival === 'recovery',
+    arrivedFrom: arrival === 'signup' ? 'signup' : null,
+    dismissArrival: () => set({ arrivedFrom: null, recovery: false }),
 
     signUp: async (email, password) => {
       if (!client) return { ok: false, message: 'Sync isn’t set up on this build.' }
@@ -203,7 +222,7 @@ export const useSync = create<SyncState>()((set, get) => {
       if (error) return { ok: false, message: friendly(error.message) }
       // Supabase hides whether an email is taken; an account with no identities means it already exists.
       if (data.user && data.user.identities && data.user.identities.length === 0) return { ok: false, message: 'That email already has an account. Try signing in.' }
-      if (!data.session) return { ok: true, step: 'code' }
+      if (!data.session) return { ok: true, step: EMAIL_CODES ? 'code' : 'link' }
       return { ok: true }
     },
     verifySignup: async (email, code) => {
@@ -214,9 +233,9 @@ export const useSync = create<SyncState>()((set, get) => {
     resendCode: async (email, kind) => {
       if (!client) return { ok: false, message: 'Sync isn’t set up on this build.' }
       const { error } = kind === 'signup'
-        ? await client.auth.resend({ type: 'signup', email: email.trim() })
+        ? await client.auth.resend({ type: 'signup', email: email.trim(), options: { emailRedirectTo: window.location.origin } })
         : await client.auth.resetPasswordForEmail(email.trim())
-      return error ? { ok: false, message: friendly(error.message) } : { ok: true, message: 'New code sent. The older one no longer works.' }
+      return error ? { ok: false, message: friendly(error.message) } : { ok: true, message: EMAIL_CODES ? 'New code sent. The older one no longer works.' : 'Email sent again. Use the newest one.' }
     },
     resetWithCode: async (email, code, password) => {
       if (!client) return { ok: false, message: 'Sync isn’t set up on this build.' }
@@ -240,6 +259,7 @@ export const useSync = create<SyncState>()((set, get) => {
       if (!client) return { ok: false, message: 'Sync isn’t set up on this build.' }
       const { error } = await client.auth.signInWithPassword({ email: email.trim(), password })
       if (error && /email not confirmed/i.test(error.message)) {
+        if (!EMAIL_CODES) return { ok: false, step: 'link', message: 'Not confirmed yet. Tap the link in the email first.' }
         await client.auth.resend({ type: 'signup', email: email.trim() })
         return { ok: false, step: 'code', message: 'Confirm your email first. We just sent you a code.' }
       }
@@ -253,14 +273,14 @@ export const useSync = create<SyncState>()((set, get) => {
     },
     sendReset: async (email) => {
       if (!client) return { ok: false, message: 'Sync isn’t set up on this build.' }
-      const { error } = await client.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/settings` })
-      return error ? { ok: false, message: friendly(error.message) } : { ok: true, step: 'code' }
+      const { error } = await client.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin })
+      if (error) return { ok: false, message: friendly(error.message) }
+      return EMAIL_CODES ? { ok: true, step: 'code' } : { ok: true, message: 'Check your email for a reset link. Open it, choose a new password on the page that appears, then come back here and sign in.' }
     },
     setNewPassword: async (password) => {
       if (!client) return { ok: false, message: 'Sync isn’t set up on this build.' }
       const { error } = await client.auth.updateUser({ password })
       if (error) return { ok: false, message: friendly(error.message) }
-      set({ recovery: false })
       return { ok: true, message: 'Password updated.' }
     },
     changePassword: async (current, next) => {

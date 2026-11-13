@@ -15,7 +15,6 @@ export default function Onboarding() {
   const [units, setUnits] = useState<'lb' | 'kg'>('lb')
   const [step, setStep] = useState(0)
   const [account, setAccount] = useState(false)
-  const recovery = useSync((s) => s.recovery)
   const signedInEmail = useSync((s) => s.email)
 
   const finish = () => {
@@ -77,7 +76,7 @@ export default function Onboarding() {
           )}
         </div>
       </motion.div>
-      <Modal open={account || recovery} onClose={() => setAccount(false)} title={recovery ? 'Reset password' : 'Your account'}>
+      <Modal open={account} onClose={() => setAccount(false)} title="Your account">
         <AccountPanel onSignedIn={() => setAccount(false)} />
       </Modal>
     </div>

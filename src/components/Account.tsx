@@ -1,13 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { clsx } from 'clsx'
-import { Cloud, CloudOff, RefreshCw, LogOut, Check, TriangleAlert, Eye, EyeOff, KeyRound, Trash2 } from 'lucide-react'
-import { useSync, syncConfigured, type Conflict } from '@/store/sync'
+import { MailCheck, Cloud, CloudOff, RefreshCw, LogOut, Check, TriangleAlert, Eye, EyeOff, KeyRound, Trash2 } from 'lucide-react'
+import { useSync, syncConfigured, EMAIL_CODES, type Conflict } from '@/store/sync'
 import { useStore } from '@/store/useStore'
 import { computeStats } from '@/lib/stats'
 import { Modal } from './ui'
 import type { EraState } from '@/lib/types'
 
-type Mode = 'signin' | 'signup' | 'reset' | 'verify' | 'reset-code'
+type Mode = 'signin' | 'signup' | 'reset' | 'verify' | 'reset-code' | 'link'
 
 /** Password field with a show/hide toggle. */
 export function PasswordInput({ value, onChange, placeholder, autoComplete }: { value: string; onChange: (v: string) => void; placeholder: string; autoComplete: string }) {
@@ -125,12 +125,17 @@ export function AccountPanel({ onSignedIn }: { onSignedIn?: () => void }) {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setBusy(true); setMsg(null)
-    const r = mode === 'signin' ? await sync.signIn(email, password)
+    const r = mode === 'signin' || mode === 'link' ? await sync.signIn(email, password)
       : mode === 'signup' ? await sync.signUp(email, password)
       : mode === 'reset' ? await sync.sendReset(email)
       : mode === 'verify' ? await sync.verifySignup(email, clean)
       : await sync.resetWithCode(email, clean, password)
     setBusy(false)
+    if (r.step === 'link') {
+      setMode('link')
+      setMsg(r.message && mode === 'link' ? { ok: false, text: r.message } : null)
+      return
+    }
     if (r.step === 'code') {
       setCode(''); setCooldownUntil(Date.now() + 60_000)
       setMode(mode === 'reset' ? 'reset-code' : 'verify')
@@ -145,13 +150,39 @@ export function AccountPanel({ onSignedIn }: { onSignedIn?: () => void }) {
   const resend = async () => {
     if (Date.now() < cooldownUntil) { setMsg({ ok: false, text: 'Give it a minute before asking for another code.' }); return }
     setBusy(true)
-    const r = await sync.resendCode(email, mode === 'verify' ? 'signup' : 'reset')
+    const r = await sync.resendCode(email, mode === 'verify' || mode === 'link' ? 'signup' : 'reset')
     setBusy(false)
     if (r.ok) setCooldownUntil(Date.now() + 60_000)
     setMsg({ ok: r.ok, text: r.message || '' })
   }
 
   const message = msg && <div role="status" className={clsx('text-sm', msg.ok ? 'text-lavender-600 dark:text-lavender-300' : 'text-rose-500')}>{msg.text}</div>
+
+  if (mode === 'link') {
+    return (
+      <form className="space-y-3" onSubmit={submit}>
+        <LinkWatcher email={email} password={password} onSignedIn={onSignedIn} />
+        <div className="flex items-start gap-3">
+          <span className="size-10 rounded-full grid place-items-center bg-lavender-100 dark:bg-lavender-500/20 text-lavender-600 dark:text-lavender-200 shrink-0"><MailCheck size={18} /></span>
+          <div>
+            <div className="font-semibold">One tap left: confirm your email</div>
+            <p className="text-sm text-muted mt-0.5">We sent a link to <b className="text-ink break-all">{email}</b>. The sender shows as Supabase Auth, and it may land in spam.</p>
+          </div>
+        </div>
+        <ol className="text-sm text-muted space-y-1 list-decimal pl-5">
+          <li>Open the email and tap <b className="text-ink">Confirm your mail</b>.</li>
+          <li>A page will open. You can close it straight away.</li>
+          <li>Come back here and press Continue.</li>
+        </ol>
+        {message}
+        <button className="btn-primary w-full" disabled={busy}>{busy ? 'Checking…' : 'I’ve confirmed. Continue'}</button>
+        <div className="flex items-center justify-between text-xs">
+          <button type="button" className="text-muted underline" onClick={() => go('signin')}>Back to sign in</button>
+          <button type="button" className="text-muted underline" disabled={busy} onClick={() => void resend()}>Send the email again</button>
+        </div>
+      </form>
+    )
+  }
 
   if (mode === 'verify' || mode === 'reset-code') {
     return (
@@ -179,16 +210,94 @@ export function AccountPanel({ onSignedIn }: { onSignedIn?: () => void }) {
       </div>
       <input type="email" className="input" placeholder="Email" autoComplete="email" autoCapitalize="none" required value={email} onChange={(e) => setEmail(e.target.value)} />
       {mode !== 'reset' && <PasswordInput value={password} onChange={setPassword} placeholder={mode === 'signup' ? 'Password (6+ characters)' : 'Password'} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} />}
-      {mode === 'reset' && <p className="text-xs text-muted">We’ll email you a code. Enter it here with a new password.</p>}
+      {mode === 'reset' && <p className="text-xs text-muted">{EMAIL_CODES ? 'We’ll email you a code. Enter it here with a new password.' : 'We’ll email you a link. It opens a page where you choose a new password.'}</p>}
       {message}
-      <button className="btn-primary w-full" disabled={busy}>{busy ? 'One moment…' : mode === 'signin' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Email me a code'}</button>
+      <button className="btn-primary w-full" disabled={busy}>{busy ? 'One moment…' : mode === 'signin' ? 'Sign in' : mode === 'signup' ? 'Create account' : EMAIL_CODES ? 'Email me a code' : 'Email me a reset link'}</button>
       <div className="text-center text-xs">
         {mode === 'reset'
           ? <button type="button" className="text-muted underline" onClick={() => go('signin')}>Back to sign in</button>
           : <button type="button" className="text-muted underline" onClick={() => go('reset')}>Forgot password?</button>}
       </div>
-      {mode === 'signup' && <p className="text-xs text-muted">We’ll email a short code to confirm it’s you. Your account keeps your progress backed up and in step across your phone and computer.</p>}
+      {mode === 'signup' && <p className="text-xs text-muted">{EMAIL_CODES ? 'We’ll email a short code to confirm it’s you.' : 'We’ll email a link to confirm it’s you.'} Your account keeps your progress backed up and in step across your phone and computer.</p>}
     </form>
+  )
+}
+
+/** While the 'confirm your email' screen is showing, quietly try to sign in each time the person returns to the app. */
+function LinkWatcher({ email, password, onSignedIn }: { email: string; password: string; onSignedIn?: () => void }) {
+  const signIn = useSync((s) => s.signIn)
+  useEffect(() => {
+    let running = false
+    const attempt = async () => {
+      if (document.visibilityState !== 'visible' || running || !password) return
+      running = true
+      const r = await signIn(email, password)
+      running = false
+      if (r.ok) onSignedIn?.()
+    }
+    const onVisible = () => void attempt()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => { document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('focus', onVisible) }
+  }, [email, password, signIn, onSignedIn])
+  return null
+}
+
+/** Full-screen page shown when an email link opened the app: finishing a password reset, or a confirmed sign-up. */
+export function EmailLinkLanding() {
+  const recovery = useSync((s) => s.recovery)
+  const arrivedFrom = useSync((s) => s.arrivedFrom)
+  const setNewPassword = useSync((s) => s.setNewPassword)
+  const dismiss = useSync((s) => s.dismissArrival)
+  const ready = useSync((s) => s.ready)
+  const userId = useSync((s) => s.userId)
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [done, setDone] = useState(false)
+  const shell = (children: React.ReactNode) => (
+    <div className="min-h-screen grid place-items-center p-5">
+      <div className="card p-7 sm:p-9 w-full max-w-md">
+        <div className="h-display text-2xl gradient-text">The 90-Day Era</div>
+        <div className="mt-5 space-y-4">{children}</div>
+      </div>
+    </div>
+  )
+  const backHint = <p className="text-sm text-muted">If this page opened inside your email app, close it and go back to The 90-Day Era.</p>
+
+  if (arrivedFrom === 'signup' && !recovery) {
+    return shell(<>
+      <div className="text-4xl">✅</div>
+      <div className="h-display text-2xl">Email confirmed</div>
+      <p className="text-muted">Your account is ready. Go back to the app and press <b className="text-ink">Continue</b>.</p>
+      {backHint}
+      <button className="btn-soft w-full" onClick={dismiss}>Or carry on in this window</button>
+    </>)
+  }
+  if (done) {
+    return shell(<>
+      <div className="text-4xl">🔐</div>
+      <div className="h-display text-2xl">Password updated</div>
+      <p className="text-muted">Sign in with your new password from now on.</p>
+      {backHint}
+      <button className="btn-soft w-full" onClick={dismiss}>Or carry on in this window</button>
+    </>)
+  }
+  if (ready && !userId) {
+    return shell(<>
+      <div className="text-4xl">⌛</div>
+      <div className="h-display text-2xl">This link has expired</div>
+      <p className="text-muted">Links work once and for about an hour. Go back to the app and ask for a new email, then use the newest one.</p>
+      <button className="btn-soft w-full" onClick={dismiss}>Back to the app</button>
+    </>)
+  }
+  return shell(
+    <form className="space-y-3" onSubmit={async (e) => { e.preventDefault(); setBusy(true); setErr(null); const r = await setNewPassword(password); setBusy(false); if (r.ok) { setPassword(''); setDone(true) } else setErr(r.message || 'Could not update the password.') }}>
+      <div className="h-display text-2xl">Choose a new password</div>
+      <PasswordInput value={password} onChange={setPassword} placeholder="New password (6+ characters)" autoComplete="new-password" />
+      {err && <div className="text-sm text-rose-500">{err}</div>}
+      <button className="btn-primary w-full" disabled={busy || !ready}>{busy ? 'Saving…' : 'Save new password'}</button>
+    </form>,
   )
 }
 

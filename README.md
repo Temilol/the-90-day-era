@@ -38,6 +38,7 @@ Optional cloud sync uses Supabase with email and password sign-in:
 1. Run `supabase/schema.sql` once in the Supabase SQL Editor.
 2. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (see `.env.example`) in `.env.local` for local use and in the Render service's Environment tab for the live site.
 3. In Supabase → Authentication → URL Configuration, set the Site URL to the live address.
-4. In Supabase → Authentication → Emails, change the "Confirm signup" and "Reset password" templates to show `{{ .Token }}`. The app confirms sign-ups and resets passwords with an emailed code, not a link.
+
+Sign-up confirmation and password reset use Supabase's standard emailed links. To use typed codes instead, connect custom SMTP in Supabase, change the "Confirm signup" and "Reset password" email templates to show `{{ .Token }}`, and set `VITE_AUTH_EMAIL_CODES=true`.
 
 Each account has one row holding the whole saved state plus a version number. A device uploads only if the cloud version is the one it last saw; if both sides changed, the app asks which copy to keep and backs up the other.

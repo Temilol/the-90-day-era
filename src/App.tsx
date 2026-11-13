@@ -2,6 +2,8 @@ import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { useStore } from './store/useStore'
+import { useSync } from './store/sync'
+import { EmailLinkLanding } from './components/Account'
 import Onboarding from './pages/Onboarding'
 import Dashboard from './pages/Dashboard'
 import Today from './pages/Today'
@@ -19,6 +21,8 @@ const SettingsPage = lazy(() => import('./pages/Settings'))
 
 export default function App() {
   const onboarded = useStore((s) => s.profile.onboarded)
+  const fromEmail = useSync((s) => s.recovery || s.arrivedFrom === 'signup')
+  if (fromEmail) return <EmailLinkLanding />
   if (!onboarded) return <Onboarding />
   return (
     <Suspense fallback={<div className="min-h-[40vh] grid place-items-center text-muted text-sm">Loading…</div>}>
