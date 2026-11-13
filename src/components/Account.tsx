@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { clsx } from 'clsx'
-import { Cloud, CloudOff, RefreshCw, LogOut, Check, TriangleAlert } from 'lucide-react'
+import { Cloud, CloudOff, RefreshCw, LogOut, Check, TriangleAlert, Eye, EyeOff, KeyRound, Trash2 } from 'lucide-react'
 import { useSync, syncConfigured, type Conflict } from '@/store/sync'
 import { useStore } from '@/store/useStore'
 import { computeStats } from '@/lib/stats'
@@ -9,6 +9,62 @@ import type { EraState } from '@/lib/types'
 
 type Mode = 'signin' | 'signup' | 'reset'
 
+/** Password field with a show/hide toggle. */
+export function PasswordInput({ value, onChange, placeholder, autoComplete }: { value: string; onChange: (v: string) => void; placeholder: string; autoComplete: string }) {
+  const [show, setShow] = useState(false)
+  return (
+    <div className="relative">
+      <input type={show ? 'text' : 'password'} className="input pr-12" placeholder={placeholder} autoComplete={autoComplete} minLength={6} required value={value} onChange={(e) => onChange(e.target.value)} autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+      <button type="button" onClick={() => setShow(!show)} aria-label={show ? 'Hide password' : 'Show password'} aria-pressed={show} className="absolute right-1.5 top-1/2 -translate-y-1/2 size-9 grid place-items-center rounded-full text-muted hover:text-ink">{show ? <EyeOff size={17} /> : <Eye size={17} />}</button>
+    </div>
+  )
+}
+
+function ChangePassword({ onDone }: { onDone: () => void }) {
+  const change = useSync((s) => s.changePassword)
+  const [current, setCurrent] = useState('')
+  const [next, setNext] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  return (
+    <form className="space-y-3" onSubmit={async (e) => {
+      e.preventDefault()
+      if (next === current) { setMsg({ ok: false, text: 'New password must be different from the current one.' }); return }
+      setBusy(true); setMsg(null)
+      const r = await change(current, next)
+      setBusy(false); setMsg({ ok: r.ok, text: r.message || '' })
+      if (r.ok) { setCurrent(''); setNext(''); setTimeout(onDone, 1200) }
+    }}>
+      <PasswordInput value={current} onChange={setCurrent} placeholder="Current password" autoComplete="current-password" />
+      <PasswordInput value={next} onChange={setNext} placeholder="New password (6+ characters)" autoComplete="new-password" />
+      {msg && <div className={clsx('text-sm', msg.ok ? 'text-lavender-600 dark:text-lavender-300' : 'text-rose-500')}>{msg.text}</div>}
+      <button className="btn-primary w-full" disabled={busy}>{busy ? 'Saving…' : 'Change password'}</button>
+      <p className="text-xs text-muted">Other devices stay signed in. Use the new password next time you sign in anywhere.</p>
+    </form>
+  )
+}
+
+function DeleteAccount({ onDone }: { onDone: () => void }) {
+  const del = useSync((s) => s.deleteAccount)
+  const email = useSync((s) => s.email)
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted">This permanently deletes the account <b className="text-ink">{email}</b> and the copy of your progress stored in the cloud. It cannot be undone.</p>
+      <p className="text-sm text-muted">Progress saved on this device stays here, so you can keep using the app without an account. Other devices keep their own copy but stop syncing.</p>
+      <p className="text-sm text-muted">Type <b className="text-ink">DELETE</b> to confirm.</p>
+      <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="DELETE" autoCapitalize="characters" />
+      {err && <div className="text-sm text-rose-500">{err}</div>}
+      <div className="flex gap-2">
+        <button className="btn-soft flex-1" onClick={onDone}>Keep my account</button>
+        <button className="btn-danger flex-1" disabled={text !== 'DELETE' || busy} onClick={async () => { setBusy(true); setErr(null); const r = await del(); setBusy(false); if (r.ok) onDone(); else setErr(r.message || 'Could not delete the account.') }}>{busy ? 'Deleting…' : 'Delete account'}</button>
+      </div>
+    </div>
+  )
+}
+
 export function AccountPanel({ onSignedIn }: { onSignedIn?: () => void }) {
   const sync = useSync()
   const [mode, setMode] = useState<Mode>('signin')
@@ -16,6 +72,7 @@ export function AccountPanel({ onSignedIn }: { onSignedIn?: () => void }) {
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [dialog, setDialog] = useState<'password' | 'delete' | null>(null)
 
   if (!syncConfigured) {
     return <p className="text-sm text-muted">Cloud sync isn’t switched on for this copy of the app yet. Your data is saved on this device, and you can move it with Export and Import.</p>
@@ -26,7 +83,7 @@ export function AccountPanel({ onSignedIn }: { onSignedIn?: () => void }) {
     return (
       <form className="space-y-3" onSubmit={async (e) => { e.preventDefault(); setBusy(true); const r = await sync.setNewPassword(password); setBusy(false); setPassword(''); setMsg({ ok: r.ok, text: r.message || '' }) }}>
         <div className="font-semibold">Choose a new password</div>
-        <input type="password" className="input" placeholder="New password (6+ characters)" autoComplete="new-password" minLength={6} required value={password} onChange={(e) => setPassword(e.target.value)} />
+        <PasswordInput value={password} onChange={setPassword} placeholder="New password (6+ characters)" autoComplete="new-password" />
         {msg && <div className={clsx('text-sm', msg.ok ? 'text-lavender-600 dark:text-lavender-300' : 'text-rose-500')}>{msg.text}</div>}
         <button className="btn-primary w-full" disabled={busy}>{busy ? 'Saving…' : 'Save new password'}</button>
       </form>
@@ -50,6 +107,12 @@ export function AccountPanel({ onSignedIn }: { onSignedIn?: () => void }) {
           <button className="btn-soft" disabled={sync.status === 'syncing'} onClick={() => void sync.syncNow()}><RefreshCw size={15} /> Sync now</button>
           <button className="btn-ghost border border-line" onClick={() => { if (confirm('Sign out? Your data stays on this device and in the cloud.')) void sync.signOut() }}><LogOut size={15} /> Sign out</button>
         </div>
+        <div className="flex items-center justify-between pt-1 text-xs">
+          <button className="inline-flex items-center gap-1.5 text-muted hover:text-ink font-medium" onClick={() => setDialog('password')}><KeyRound size={13} /> Change password</button>
+          <button className="inline-flex items-center gap-1.5 text-rose-500 font-medium" onClick={() => setDialog('delete')}><Trash2 size={13} /> Delete account</button>
+        </div>
+        <Modal open={dialog === 'password'} onClose={() => setDialog(null)} title="Change password"><ChangePassword onDone={() => setDialog(null)} /></Modal>
+        <Modal open={dialog === 'delete'} onClose={() => setDialog(null)} title="Delete account?"><DeleteAccount onDone={() => setDialog(null)} /></Modal>
       </div>
     )
   }
@@ -69,7 +132,7 @@ export function AccountPanel({ onSignedIn }: { onSignedIn?: () => void }) {
         {(['signin', 'signup'] as const).map((m) => <button type="button" key={m} onClick={() => { setMode(m); setMsg(null) }} className={clsx('rounded-full py-2 transition', mode === m ? 'bg-card shadow-soft text-ink' : 'text-muted')}>{m === 'signin' ? 'Sign in' : 'Create account'}</button>)}
       </div>
       <input type="email" className="input" placeholder="Email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-      {mode !== 'reset' && <input type="password" className="input" placeholder={mode === 'signup' ? 'Password (6+ characters)' : 'Password'} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} minLength={6} required value={password} onChange={(e) => setPassword(e.target.value)} />}
+      {mode !== 'reset' && <PasswordInput value={password} onChange={setPassword} placeholder={mode === 'signup' ? 'Password (6+ characters)' : 'Password'} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} />}
       {msg && <div className={clsx('text-sm', msg.ok ? 'text-lavender-600 dark:text-lavender-300' : 'text-rose-500')}>{msg.text}</div>}
       <button className="btn-primary w-full" disabled={busy}>{busy ? 'One moment…' : mode === 'signin' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Email me a reset link'}</button>
       <div className="text-center text-xs">

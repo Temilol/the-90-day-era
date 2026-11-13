@@ -32,6 +32,8 @@ interface SyncState {
   signOut: () => Promise<void>
   sendReset: (email: string) => Promise<{ ok: boolean; message?: string }>
   setNewPassword: (password: string) => Promise<{ ok: boolean; message?: string }>
+  changePassword: (current: string, next: string) => Promise<{ ok: boolean; message?: string }>
+  deleteAccount: () => Promise<{ ok: boolean; message?: string }>
   syncNow: () => Promise<void>
   resolveConflict: (keep: 'cloud' | 'device') => Promise<void>
 }
@@ -59,6 +61,8 @@ function friendly(message: string | undefined): string {
   if (m.includes('already registered')) return 'That email already has an account. Try signing in.'
   if (m.includes('email not confirmed')) return 'Please confirm your email first. Check your inbox.'
   if (m.includes('password should be')) return 'Password needs at least 6 characters.'
+  if (m.includes('different from the old')) return 'New password must be different from the current one.'
+  if (m.includes('weak') || m.includes('pwned')) return 'That password is too easy to guess. Try a longer one.'
   if (m.includes('rate limit')) return 'Too many attempts. Wait a minute and try again.'
   if (m.includes('failed to fetch') || m.includes('network')) return 'Can’t reach the server. Check your connection.'
   return message || 'Something went wrong.'
@@ -216,6 +220,28 @@ export const useSync = create<SyncState>()((set, get) => {
       if (error) return { ok: false, message: friendly(error.message) }
       set({ recovery: false })
       return { ok: true, message: 'Password updated.' }
+    },
+    changePassword: async (current, next) => {
+      const email = get().email
+      if (!client || !email) return { ok: false, message: 'You need to be signed in.' }
+      // Prove it's really you before changing anything.
+      const check = await client.auth.signInWithPassword({ email, password: current })
+      if (check.error) return { ok: false, message: isNetwork(check.error.message) ? friendly(check.error.message) : 'Your current password isn’t right.' }
+      const { error } = await client.auth.updateUser({ password: next })
+      if (error) return { ok: false, message: friendly(error.message) }
+      return { ok: true, message: 'Password changed.' }
+    },
+    deleteAccount: async () => {
+      if (!client || !get().userId) return { ok: false, message: 'You need to be signed in.' }
+      const { error } = await client.rpc('delete_my_account')
+      if (error) {
+        if (error.code === 'PGRST202' || /could not find the function/i.test(error.message)) return { ok: false, message: 'Account deletion isn’t set up on the server yet.' }
+        return { ok: false, message: friendly(error.message) }
+      }
+      await client.auth.signOut({ scope: 'local' }).catch(() => {})
+      writeMeta({ ...EMPTY_META })
+      set({ userId: null, email: null, status: 'signed-out', conflict: null, error: null, lastSyncedAt: null })
+      return { ok: true }
     },
     syncNow: reconcile,
     resolveConflict: async (keep) => {
