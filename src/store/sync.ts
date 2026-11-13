@@ -27,10 +27,13 @@ interface SyncState {
   lastSyncedAt: string | null
   conflict: Conflict | null
   recovery: boolean // arrived from a password-reset email
-  signUp: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>
-  signIn: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>
+  signUp: (email: string, password: string) => Promise<{ ok: boolean; message?: string; step?: 'code' }>
+  signIn: (email: string, password: string) => Promise<{ ok: boolean; message?: string; step?: 'code' }>
+  verifySignup: (email: string, code: string) => Promise<{ ok: boolean; message?: string; step?: 'code' }>
+  resendCode: (email: string, kind: 'signup' | 'reset') => Promise<{ ok: boolean; message?: string; step?: 'code' }>
+  resetWithCode: (email: string, code: string, password: string) => Promise<{ ok: boolean; message?: string; step?: 'code' }>
   signOut: () => Promise<void>
-  sendReset: (email: string) => Promise<{ ok: boolean; message?: string }>
+  sendReset: (email: string) => Promise<{ ok: boolean; message?: string; step?: 'code' }>
   setNewPassword: (password: string) => Promise<{ ok: boolean; message?: string }>
   changePassword: (current: string, next: string) => Promise<{ ok: boolean; message?: string }>
   deleteAccount: () => Promise<{ ok: boolean; message?: string }>
@@ -54,6 +57,7 @@ let changeCounter = 0
 let pushTimer: ReturnType<typeof setTimeout> | null = null
 let busy = false
 let again = false
+let codeReset = false // a reset-by-code is in progress, so don't show the separate recovery form
 
 function friendly(message: string | undefined): string {
   const m = (message || '').toLowerCase()
@@ -63,7 +67,9 @@ function friendly(message: string | undefined): string {
   if (m.includes('password should be')) return 'Password needs at least 6 characters.'
   if (m.includes('different from the old')) return 'New password must be different from the current one.'
   if (m.includes('weak') || m.includes('pwned')) return 'That password is too easy to guess. Try a longer one.'
-  if (m.includes('rate limit')) return 'Too many attempts. Wait a minute and try again.'
+  if (m.includes('rate limit')) return 'Too many emails requested. Wait a while and try again.'
+  if (m.includes('expired') || m.includes('invalid') && m.includes('token') || m.includes('otp')) return 'That code is wrong or has expired. Check it, or request a new one.'
+  if (m.includes('security purposes')) return 'Please wait a minute before requesting another code.'
   if (m.includes('failed to fetch') || m.includes('network')) return 'Can’t reach the server. Check your connection.'
   return message || 'Something went wrong.'
 }
@@ -152,7 +158,7 @@ export const useSync = create<SyncState>()((set, get) => {
     }
 
     client.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') set({ recovery: true })
+      if (event === 'PASSWORD_RECOVERY' && !codeReset) set({ recovery: true })
       const uid = session?.user?.id ?? null
       const changed = uid !== get().userId
       set({ ready: true, userId: uid, email: session?.user?.email ?? null, ...(uid ? {} : { status: 'signed-out' as SyncStatus, conflict: null }) })
@@ -195,12 +201,48 @@ export const useSync = create<SyncState>()((set, get) => {
       if (!client) return { ok: false, message: 'Sync isn’t set up on this build.' }
       const { data, error } = await client.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: window.location.origin } })
       if (error) return { ok: false, message: friendly(error.message) }
-      if (!data.session) return { ok: true, message: 'Almost there. Open the confirmation email we just sent, then sign in.' }
+      // Supabase hides whether an email is taken; an account with no identities means it already exists.
+      if (data.user && data.user.identities && data.user.identities.length === 0) return { ok: false, message: 'That email already has an account. Try signing in.' }
+      if (!data.session) return { ok: true, step: 'code' }
       return { ok: true }
+    },
+    verifySignup: async (email, code) => {
+      if (!client) return { ok: false, message: 'Sync isn’t set up on this build.' }
+      const { error } = await client.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: 'signup' })
+      return error ? { ok: false, message: friendly(error.message) } : { ok: true }
+    },
+    resendCode: async (email, kind) => {
+      if (!client) return { ok: false, message: 'Sync isn’t set up on this build.' }
+      const { error } = kind === 'signup'
+        ? await client.auth.resend({ type: 'signup', email: email.trim() })
+        : await client.auth.resetPasswordForEmail(email.trim())
+      return error ? { ok: false, message: friendly(error.message) } : { ok: true, message: 'New code sent. The older one no longer works.' }
+    },
+    resetWithCode: async (email, code, password) => {
+      if (!client) return { ok: false, message: 'Sync isn’t set up on this build.' }
+      codeReset = true
+      try {
+        const { error } = await client.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: 'recovery' })
+        if (error) return { ok: false, message: friendly(error.message) }
+        const upd = await client.auth.updateUser({ password })
+        if (upd.error) {
+          // The code was right and you're signed in, but the new password was rejected: finish on the recovery form.
+          set({ recovery: true })
+          return { ok: false, message: friendly(upd.error.message) }
+        }
+        set({ recovery: false })
+        return { ok: true }
+      } finally {
+        codeReset = false
+      }
     },
     signIn: async (email, password) => {
       if (!client) return { ok: false, message: 'Sync isn’t set up on this build.' }
       const { error } = await client.auth.signInWithPassword({ email: email.trim(), password })
+      if (error && /email not confirmed/i.test(error.message)) {
+        await client.auth.resend({ type: 'signup', email: email.trim() })
+        return { ok: false, step: 'code', message: 'Confirm your email first. We just sent you a code.' }
+      }
       return error ? { ok: false, message: friendly(error.message) } : { ok: true }
     },
     signOut: async () => {
@@ -212,7 +254,7 @@ export const useSync = create<SyncState>()((set, get) => {
     sendReset: async (email) => {
       if (!client) return { ok: false, message: 'Sync isn’t set up on this build.' }
       const { error } = await client.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/settings` })
-      return error ? { ok: false, message: friendly(error.message) } : { ok: true, message: 'Check your email for a reset link.' }
+      return error ? { ok: false, message: friendly(error.message) } : { ok: true, step: 'code' }
     },
     setNewPassword: async (password) => {
       if (!client) return { ok: false, message: 'Sync isn’t set up on this build.' }
