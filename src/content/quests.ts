@@ -8,7 +8,7 @@ export interface Quest {
   avoid?: ShiftType[] // can't sensibly be done on these kinds of day: left out of that day's draw
 }
 
-export const HYDRATION_QUEST: Quest = { id: 'hydrate', title: 'Hydration check-in', emoji: '💧', category: 'hydration', hint: 'Water with you at work, sips through the shift.' }
+export const HYDRATION_QUEST: Quest = { id: 'hydrate', title: 'Hydration', emoji: '💧', category: 'hydration', hint: 'Ticks itself when you reach your goal.' }
 
 export const QUEST_POOL: Quest[] = [
   { id: 'nourish', title: 'Eat a nourishing meal', emoji: '🥗', category: 'nutrition', hint: 'Something that makes your body feel good.' },

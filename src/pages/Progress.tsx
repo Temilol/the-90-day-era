@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { SHIFTS } from '@/components/DayPanel'
 import { addDays, dayNumber, formatDate } from '@/lib/dates'
+import { waterSettings, fromMl } from '@/lib/water'
 import { useStats } from '@/lib/hooks'
 import { TOTAL_DAYS } from '@/lib/dates'
 import { BADGES } from '@/content/badges'
@@ -13,6 +14,7 @@ import { clsx } from 'clsx'
 export default function ProgressPage() {
   const stats = useStats()
   const badges = useStore((s) => s.badges)
+  const ws = waterSettings(useStore((s) => s.profile))
   const maxW = Math.max(1, ...stats.weekly.map((w) => w.workouts))
   const milestonesHit = MILESTONES.filter((m) => stats.currentDay >= m).length
   const hydration = stats.questCounts['hydrate'] || 0
@@ -122,6 +124,7 @@ export default function ProgressPage() {
           {lifestyle.map(([e, name, n]) => (
             <div key={name}><div className="flex justify-between text-sm"><span>{e} {name}</span><span className="font-semibold">{n}</span></div><Progress value={n / maxL} className="mt-1" height="h-1.5" /></div>
           ))}
+          {stats.water.days > 0 && <p className="text-sm rounded-2xl bg-card-2 p-3">💧 You average <span className="font-semibold">{fromMl(stats.water.totalMl / stats.water.days, ws.unit)} {ws.unit}</span> on the {stats.water.days} {stats.water.days === 1 ? 'day' : 'days'} you logged water, and reached your goal on {hydration} of them.</p>}
         </Card>
       </section>
 

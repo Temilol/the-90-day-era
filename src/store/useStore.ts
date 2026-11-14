@@ -4,6 +4,7 @@ import { immer } from 'zustand/middleware/immer'
 import type { DayLog, EraState, JournalEntry, Reminder, Reward, ShiftHours, ShiftType } from '@/lib/types'
 import { DEFAULT_ELECTIVE } from '@/lib/walkPlan'
 import { planFill, type FillOptions } from '@/lib/schedule'
+import { waterSettings, goalMet } from '@/lib/water'
 import { todayKey, dayNumber, TOTAL_DAYS, weekOf, chapterOf } from '@/lib/dates'
 import { XP, walkXp, walkKind, levelFor, earnsShiftBonus, ACTIVITY_MIN_MINUTES } from '@/lib/xp'
 import { computeStats } from '@/lib/stats'
@@ -62,6 +63,9 @@ export interface Actions {
   removeStrength: (date: string) => void
   setRecovery: (date: string, on: boolean) => void
   toggleQuest: (date: string, questId: string) => void
+  /** Log a drink in millilitres. The hydration quest follows the day's total. */
+  addWater: (date: string, ml: number) => void
+  undoWater: (date: string) => void
   setBonusMission: (date: string, text: string, source: string) => void
   completeBonusMission: (date: string) => void
   clearBonusMission: (date: string) => void
@@ -153,6 +157,23 @@ function syncActivityXp(s: EraState, date: string): boolean {
   if (!earned) { revoke(s, id); return false }
   if (!had) award(s, id, XP.activity, 'Other activity', date)
   return !had
+}
+/**
+ * The hydration quest is never ticked by hand: it follows the water logged that day.
+ * Returns true when the goal was newly reached.
+ */
+function syncHydration(s: EraState, date: string): boolean {
+  const d = s.days[date]
+  if (!d || d.water === undefined) return false
+  const id = `quest:${date}:hydrate`
+  const met = goalMet(d.water, waterSettings(s.profile).goalMl)
+  if (met && !d.quests.hydrate) {
+    d.quests.hydrate = new Date().toISOString()
+    award(s, id, XP.quest, 'Daily quest', date)
+    return true
+  }
+  if (!met && d.quests.hydrate) { delete d.quests.hydrate; revoke(s, id) }
+  return false
 }
 const cleanCalories = (n: number | undefined) => (typeof n === 'number' && isFinite(n) && n > 0 ? Math.round(n) : undefined)
 function lastElectiveHours(s: EraState): ShiftHours {
@@ -285,7 +306,24 @@ export const useStore = create<Store>()(
           })
         },
 
+        addWater: (date, ml) => {
+          if (!inChallenge(get(), date) || !(ml > 0)) return
+          mutate((s) => {
+            const d = day(s, date)
+            d.waterAdds = [...(d.waterAdds ?? []), ml].slice(-60)
+            d.water = Math.min(20000, (d.water ?? 0) + ml)
+            if (syncHydration(s, date)) toast(`+${XP.quest} XP`, 'Hydration goal reached')
+          })
+        },
+        undoWater: (date) => mutate((s) => {
+          const d = s.days[date]
+          if (!d?.waterAdds?.length) return
+          const last = d.waterAdds.pop()!
+          d.water = Math.max(0, (d.water ?? 0) - last)
+          syncHydration(s, date)
+        }),
         toggleQuest: (date, questId) => {
+          if (questId === 'hydrate') return // ticks itself from the water log
           if (!inChallenge(get(), date)) return
           mutate((s) => {
             const d = day(s, date)

@@ -7,6 +7,7 @@ import { burst } from '@/components/Celebrate'
 import { Modal } from '@/components/ui'
 import { AccountPanel } from '@/components/Account'
 import { useSync, syncConfigured } from '@/store/sync'
+import { WATER_DEFAULTS, toMl, type WaterUnit } from '@/lib/water'
 
 export default function Onboarding() {
   const setProfile = useStore((s) => s.setProfile)
@@ -14,11 +15,15 @@ export default function Onboarding() {
   const [start, setStart] = useState(todayKey())
   const [units, setUnits] = useState<'lb' | 'kg'>('lb')
   const [step, setStep] = useState(0)
+  const [waterUnit, setWaterUnit] = useState<WaterUnit>('oz')
+  const [waterGoal, setWaterGoal] = useState(String(WATER_DEFAULTS.oz.goal))
+  const pickWaterUnit = (u: WaterUnit) => { if (u !== waterUnit) { setWaterUnit(u); setWaterGoal(String(WATER_DEFAULTS[u].goal)) } }
   const [account, setAccount] = useState(false)
   const signedInEmail = useSync((s) => s.email)
 
   const finish = () => {
-    setProfile({ name: name.trim(), startDate: start, units, onboarded: true })
+    const goal = parseFloat(waterGoal) > 0 ? parseFloat(waterGoal) : WATER_DEFAULTS[waterUnit].goal
+    setProfile({ name: name.trim(), startDate: start, units, onboarded: true, waterUnit, waterGoal: toMl(goal, waterUnit), waterBottle: toMl(WATER_DEFAULTS[waterUnit].bottle, waterUnit) })
     burst({ big: true })
   }
 
@@ -63,6 +68,16 @@ export default function Onboarding() {
                   <button className="chip bg-lavender-100 text-lavender-700 dark:bg-lavender-500/20 dark:text-lavender-200" onClick={() => setStart(addDays(todayKey(), 7))}>Next week</button>
                 </div>
                 <p className="text-xs text-muted mt-2">You can change this in Settings until you log your first day. Day 90 will be {formatDate(addDays(start, 89), { month: 'long', day: 'numeric', year: 'numeric' })}.</p>
+              </div>
+              <div>
+                <label className="label">Daily water goal</label>
+                <div className="flex gap-2">
+                  <input type="number" inputMode="decimal" min={1} className="input text-base flex-1 min-w-0" aria-label={`Daily water goal in ${waterUnit}`} value={waterGoal} onChange={(e) => setWaterGoal(e.target.value)} />
+                  <div className="grid grid-cols-2 gap-1 rounded-full bg-card-2 p-1 text-sm font-semibold shrink-0">
+                    {(['oz', 'ml'] as const).map((u) => <button type="button" key={u} onClick={() => pickWaterUnit(u)} className={waterUnit === u ? 'rounded-full px-3 py-1.5 bg-card shadow-soft text-ink' : 'rounded-full px-3 py-1.5 text-muted'}>{u}</button>)}
+                  </div>
+                </div>
+                <p className="text-xs text-muted mt-2">You log your water through the day, and the hydration quest ticks itself when you reach this. Pick what suits you. You can change the amount and the unit in Settings.</p>
               </div>
               <div className="rounded-2xl bg-card-2 p-4 text-sm">
                 <div className="font-semibold mb-1">Your standard workout</div>

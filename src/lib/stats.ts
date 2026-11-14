@@ -42,6 +42,7 @@ export interface Stats {
   /** Calories burned, from typed-in numbers only. Nothing here is estimated. */
   calories: { total: number; byDate: Record<string, number>; daysWithData: number; walksWithData: number; walkTotal: number; best: { date: string; value: number } | null }
   otherActivities: number
+  water: { days: number; totalMl: number } // days with any water logged, and how much
   bossesDefeated: number
   reflections: number
   purchases: number
@@ -148,6 +149,8 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
     calories.daysWithData++
     if (!calories.best || sum > calories.best.value) calories.best = { date: d.date, value: sum }
   }
+  const water: Stats['water'] = { days: 0, totalMl: 0 }
+  for (const d of logs) if (d.water && d.water > 0) { water.days++; water.totalMl += d.water }
   const bossesDefeated = s.xp.filter((e) => e.id.startsWith('boss:')).length
   const reflections = Object.keys(s.reflections).length
   const envelopesOpened = Object.values(s.envelopes).filter((e) => e.openedAt).length
@@ -207,7 +210,7 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
     daysLogged, daysRemaining: Math.max(0, TOTAL_DAYS - Math.min(currentDay, TOTAL_DAYS)),
     workouts, fullWorkouts, walkingMinutes, strengthSessions, strengthMinutes, recoveryDays,
     streak, bestStreak, lifetimeXp, spentXp, spendableXp, level: levelFor(lifetimeXp),
-    questsCompleted, questCounts, selfCareQuests, journalEntries, nightShiftWorkouts, dayShiftWorkouts, byShift, calories, otherActivities,
+    questsCompleted, questCounts, selfCareQuests, journalEntries, nightShiftWorkouts, dayShiftWorkouts, byShift, calories, otherActivities, water,
     bossesDefeated, reflections, purchases: s.purchases.length, spins: s.spins.length, envelopesOpened,
     comebacks, themesUsed, bonusMissions, weekly, nsvs: s.nsvs.length, weights: s.weights.length, activeDates, frozenDates, freezesLeft, freezesLeftByChapter, bonusFreezes, secrets,
   }

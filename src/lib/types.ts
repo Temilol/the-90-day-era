@@ -45,6 +45,8 @@ export interface DayLog {
   activities?: Activity[]
   doubleXp?: string // id of the double-XP prize switched on for this day
   swaps?: string[] // quests traded away on this day
+  water?: number // millilitres drunk; the hydration quest ticks itself when this reaches the goal
+  waterAdds?: number[] // each drink in order, so the last one can be undone
   workout?: Workout
   strength?: StrengthSession
   recovery?: boolean // planned recovery day
@@ -106,7 +108,7 @@ export interface Spin { at: string; category: string; result: string }
 
 export interface EraState {
   version: number
-  profile: { name: string; startDate: string | null; units: 'lb' | 'kg'; onboarded: boolean; walkReminders?: boolean /* remind before each walk window; on unless set to false */ }
+  profile: { name: string; startDate: string | null; units: 'lb' | 'kg'; onboarded: boolean; walkReminders?: boolean /* remind before each walk window; on unless set to false */; waterUnit?: 'oz' | 'ml'; waterGoal?: number /* ml */; waterBottle?: number /* ml */; waterNudges?: boolean /* on unless set to false */ }
   days: Record<string, DayLog>
   xp: XpEntry[]
   purchases: Purchase[]

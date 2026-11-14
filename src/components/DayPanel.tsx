@@ -7,7 +7,8 @@ import { walkXp, XP, earnsShiftBonus, ACTIVITY_MIN_MINUTES } from '@/lib/xp'
 import { DEFAULT_ELECTIVE } from '@/lib/walkPlan'
 import type { ShiftType } from '@/lib/types'
 import { THEMES } from '@/content/themes'
-import { Check, Modal } from './ui'
+import { Check, Modal, Progress } from './ui'
+import { waterSettings, fromMl, toMl, goalMet } from '@/lib/water'
 import { burst, hearts } from './Celebrate'
 import { tap } from '@/lib/haptics'
 import { Shuffle, Trash2, Flame, Plus, X, Repeat } from 'lucide-react'
@@ -287,6 +288,67 @@ export function WorkoutCard({ date, locked }: { date: string; locked?: boolean }
   )
 }
 
+/** Hydration is logged, not ticked: the quest completes itself when the day's water reaches the goal. */
+function HydrationCard({ date, locked, hint }: { date: string; locked?: boolean; hint?: string }) {
+  const water = useStore((s) => s.days[date]?.water)
+  const canUndo = useStore((s) => (s.days[date]?.waterAdds?.length ?? 0) > 0)
+  const done = useStore((s) => !!s.days[date]?.quests?.hydrate)
+  const profile = useStore((s) => s.profile)
+  const addWater = useStore((s) => s.addWater)
+  const undoWater = useStore((s) => s.undoWater)
+  const [custom, setCustom] = useState(false)
+  const [amount, setAmount] = useState('')
+  const ws = waterSettings(profile)
+  const have = fromMl(water ?? 0, ws.unit)
+  const goal = fromMl(ws.goalMl, ws.unit)
+  const tickedByHand = done && water === undefined // from before water was logged
+  const add = (ml: number) => {
+    if (!(ml > 0)) return
+    const reaches = !done && goalMet((water ?? 0) + ml, ws.goalMl)
+    addWater(date, ml)
+    tap()
+    if (reaches) burst()
+  }
+  const status = tickedByHand ? 'Ticked off before water logging' : done ? `${have} of ${goal} ${ws.unit}. Goal reached` : `${have} of ${goal} ${ws.unit}`
+  return (
+    <div className={clsx('rounded-2xl border p-3 transition', done ? 'border-lavender-300 bg-lavender-50 dark:bg-lavender-500/15 dark:border-lavender-500/40' : 'border-line bg-card-2')}>
+      <div className="flex items-center gap-3">
+        <span className={clsx('grid place-items-center size-7 rounded-full shrink-0 text-sm font-bold', done ? 'bg-gradient-to-br from-lavender-500 to-blush-400 text-white shadow-glow' : 'bg-white dark:bg-white/10 border border-line')} aria-hidden>{done ? '✓' : ''}</span>
+        <span className="text-xl shrink-0">💧</span>
+        <span className="flex-1 min-w-0">
+          <span className="block font-medium">Hydration</span>
+          <span className="block text-xs text-muted break-words" role="status">{status}</span>
+        </span>
+      </div>
+      {!tickedByHand && <Progress value={Math.min(1, (water ?? 0) / ws.goalMl)} className="mt-2.5" height="h-2" />}
+      {!locked && (
+        <>
+          <div className="grid grid-cols-3 gap-1.5 mt-2.5">
+            {([['Glass', ws.glassMl], ['Bottle', ws.bottleMl]] as const).map(([label, ml]) => (
+              <button key={label} type="button" onClick={() => add(ml)} className="rounded-xl bg-card py-1.5 text-center transition active:scale-95 border border-line min-w-0" aria-label={`Add a ${label.toLowerCase()}, ${fromMl(ml, ws.unit)} ${ws.unit}`}>
+                <span className="block text-xs font-semibold">{label}</span><span className="block text-[11px] text-muted">+{fromMl(ml, ws.unit)} {ws.unit}</span>
+              </button>
+            ))}
+            <button type="button" onClick={() => setCustom((v) => !v)} className={clsx('rounded-xl py-1.5 text-center transition active:scale-95 border min-w-0', custom ? 'border-lavender-400 bg-lavender-50 dark:bg-lavender-500/15' : 'border-line bg-card')}>
+              <span className="block text-xs font-semibold">Other</span><span className="block text-[11px] text-muted">amount</span>
+            </button>
+          </div>
+          {custom && (
+            <form className="flex items-center gap-2 mt-2" onSubmit={(e) => { e.preventDefault(); add(toMl(parseFloat(amount) || 0, ws.unit)); setAmount(''); setCustom(false) }}>
+              <input type="number" inputMode="decimal" min={1} max={ws.unit === 'oz' ? 200 : 6000} step="any" autoFocus className="input !py-2 flex-1 min-w-0" placeholder={`Amount in ${ws.unit}`} aria-label={`Amount in ${ws.unit}`} value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <button type="submit" className="btn-soft !py-2 shrink-0" disabled={!(parseFloat(amount) > 0)}>Add</button>
+            </form>
+          )}
+          <div className="flex items-center justify-between gap-2 mt-2 text-xs text-muted">
+            <span className="min-w-0 break-words">{hint}</span>
+            {canUndo && <button type="button" className="underline shrink-0 whitespace-nowrap" onClick={() => undoWater(date)}>Undo last</button>}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export function QuestList({ date, locked }: { date: string; locked?: boolean }) {
   const d = useStore((s) => s.days[date])
   const toggleQuest = useStore((s) => s.toggleQuest)
@@ -302,6 +364,7 @@ export function QuestList({ date, locked }: { date: string; locked?: boolean }) 
       <div className="flex items-center justify-between text-xs text-muted px-1"><span>{doneCount}/{quests.length} complete · {XP.quest} XP each</span>{doneCount === quests.length && <span className="gradient-text font-bold">All done ✦</span>}</div>
       {canSwap && <div className="text-xs text-lavender-600 dark:text-lavender-300 px-1">🔁 You have {swapsLeft} quest {swapsLeft === 1 ? 'swap' : 'swaps'}. Tap the swap icon on a quest you’d rather trade.</div>}
       {quests.map((q) => (
+        q.id === 'hydrate' ? <HydrationCard key={q.id} date={date} locked={locked} hint={q.hint} /> :
         <div key={q.id} className="relative">
           <Check disabled={locked} checked={!!d?.quests?.[q.id]} onChange={() => { toggleQuest(date, q.id); tap(); if (!d?.quests?.[q.id] && doneCount + 1 === quests.length) burst() }} label={q.title} sub={q.hint} emoji={q.emoji} />
           {canSwap && q.id !== 'hydrate' && !d?.quests?.[q.id] && <button onClick={() => { if (swapQuest(date, q.id)) hearts() }} className="absolute right-2 top-2 btn-ghost p-1.5" aria-label={`Swap “${q.title}” for a different quest`}><Repeat size={14} /></button>}

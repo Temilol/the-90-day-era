@@ -111,7 +111,7 @@ export function Check({ checked, onChange, label, sub, emoji, disabled }: { chec
       {emoji && <span className="text-xl">{emoji}</span>}
       <span className="flex-1 min-w-0">
         <span className={clsx('block font-medium', checked && 'line-through text-muted')}>{label}</span>
-        {sub && <span className="block text-xs text-muted truncate">{sub}</span>}
+        {sub && <span className="block text-xs text-muted break-words">{sub}</span>}
       </span>
     </button>
   )

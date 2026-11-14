@@ -65,9 +65,9 @@ describe('store', () => {
   })
   it('quests toggle on/off with XP', () => {
     const s = useStore.getState()
-    s.toggleQuest(start, 'hydrate'); s.toggleQuest(start, 'hydrate'); s.toggleQuest(start, 'hydrate')
+    s.toggleQuest(start, 'stretch'); s.toggleQuest(start, 'stretch'); s.toggleQuest(start, 'stretch')
     expect(computeStats(useStore.getState(), start).lifetimeXp).toBe(5)
-    expect(useStore.getState().days[start].quests.hydrate).toBeTruthy()
+    expect(useStore.getState().days[start].quests.stretch).toBeTruthy()
   })
   it('spending XP does not reduce level progress', () => {
     const s = useStore.getState()
@@ -449,7 +449,7 @@ describe('push reminder queue', () => {
     const base = initialState()
     const state = {
       ...base,
-      profile: { ...base.profile, startDate: '2026-01-01', onboarded: true },
+      profile: { ...base.profile, startDate: '2026-01-01', onboarded: true, waterNudges: false }, // hydration nudges are tested separately
       reminders: [
         { id: 'a', label: 'Night walk', time: '16:00', shifts: ['night' as const], enabled: true },
         { id: 'b', label: 'Off', time: '10:00', shifts: ['off' as const], enabled: false },
@@ -642,7 +642,8 @@ describe('secret envelopes', () => {
     fresh()
     const s = useStore.getState()
     s.logWorkout(day1, { minutes: 30, incline: 12, speed: 3 })
-    for (const q of ['hydrate', 'nourish', 'protein', 'stretch']) s.toggleQuest(day1, q)
+    for (const q of ['nourish', 'protein', 'stretch']) s.toggleQuest(day1, q)
+    s.addWater(day1, 2000) // hydration can only be completed by logging water
     s.setBonusMission(day1, 'Dance break', 'Wheel'); s.completeBonusMission(day1)
     s.saveJournal(day1, { mood: 'good' })
     expect(secrets().perfectDay).toBe(false) // no strength yet
@@ -677,5 +678,83 @@ describe('secret envelopes', () => {
     s.removeWorkout(week2(0)) // an envelope once found stays found
     expect(secrets().perfectWeek).toBe(false)
     expect(has('secret-perfect-week')).toBe(true)
+  })
+})
+
+describe('hydration', () => {
+  const day1 = '2026-01-01'
+  const fresh = (profile: object = {}) => useStore.setState({ ...initialState(), profile: { name: 'T', startDate: day1, units: 'lb', onboarded: true, ...profile } })
+  const xp = () => computeStats(useStore.getState(), day1).lifetimeXp
+  const d = () => useStore.getState().days[day1]
+
+  it('defaults to 64 oz, converts tidily, and eight glasses reach the goal', async () => {
+    const { waterSettings, toMl, fromMl, goalMet, convertWaterSettings } = await import('@/lib/water')
+    const base = initialState().profile
+    const ws = waterSettings(base)
+    expect([ws.unit, fromMl(ws.goalMl, 'oz'), fromMl(ws.glassMl, 'oz'), fromMl(ws.bottleMl, 'oz'), ws.nudges]).toEqual(['oz', 64, 8, 24, true])
+    expect(goalMet(8 * toMl(8, 'oz'), ws.goalMl)).toBe(true)
+    expect(goalMet(7 * toMl(8, 'oz'), ws.goalMl)).toBe(false)
+    const ml = convertWaterSettings(base, 'ml')
+    expect([ml.waterUnit, ml.waterGoal, ml.waterBottle]).toEqual(['ml', 1900, 700])
+    const back = convertWaterSettings({ ...base, ...ml }, 'oz')
+    expect(fromMl(back.waterGoal!, 'oz')).toBe(64)
+  })
+  it('cannot be ticked by hand; it follows the water log in both directions', async () => {
+    const { toMl } = await import('@/lib/water')
+    fresh()
+    const s = useStore.getState()
+    s.toggleQuest(day1, 'hydrate')
+    expect(d()?.quests?.hydrate).toBeFalsy()
+    expect(xp()).toBe(0)
+    for (let i = 0; i < 2; i++) s.addWater(day1, toMl(24, 'oz'))
+    expect(d().quests.hydrate).toBeFalsy() // 48 of 64
+    s.addWater(day1, toMl(16, 'oz'))
+    expect(d().quests.hydrate).toBeTruthy()
+    expect(xp()).toBe(5)
+    s.addWater(day1, toMl(8, 'oz'))
+    expect(xp()).toBe(5) // going past the goal earns nothing more
+    s.undoWater(day1)
+    expect(d().quests.hydrate).toBeTruthy()
+    s.undoWater(day1) // back to 48
+    expect(d().quests.hydrate).toBeFalsy()
+    expect(xp()).toBe(0)
+    s.toggleQuest(day1, 'hydrate')
+    expect(d().quests.hydrate).toBeFalsy()
+    s.undoWater(day1); s.undoWater(day1); s.undoWater(day1) // nothing left to undo
+    expect(d().water).toBe(0)
+    s.addWater(day1, -50)
+    expect(d().water).toBe(0)
+  })
+  it('uses the chosen goal, and leaves an older hand-ticked day alone', async () => {
+    const { toMl } = await import('@/lib/water')
+    fresh({ waterUnit: 'ml', waterGoal: 1500 })
+    const s = useStore.getState()
+    s.addWater(day1, 750); s.addWater(day1, 750)
+    expect(d().quests.hydrate).toBeTruthy()
+    // a day ticked by hand before water logging existed keeps its tick and XP
+    useStore.setState((st) => ({ days: { ...st.days, '2026-01-02': { date: '2026-01-02', quests: { hydrate: 'x' } } }, xp: [...st.xp, { id: 'quest:2026-01-02:hydrate', amount: 5, reason: 'Daily quest', date: '2026-01-02', at: 'x' }] }))
+    expect(computeStats(useStore.getState(), '2026-01-02').lifetimeXp).toBe(10)
+    const stats = computeStats(useStore.getState(), '2026-01-02')
+    expect(stats.water).toEqual({ days: 1, totalMl: 1500 })
+    expect(stats.questCounts.hydrate).toBe(2)
+    expect(toMl(1, 'ml')).toBe(1)
+  })
+  it('nudges twice a day only while behind, and stops once the goal is met', async () => {
+    const { buildReminderQueue } = await import('@/lib/reminderQueue')
+    const { toMl } = await import('@/lib/water')
+    const base = initialState()
+    const local = (iso: string) => { const t = new Date(iso); return `${t.getDate()} ${t.getHours()}:${String(t.getMinutes()).padStart(2, '0')}` }
+    const make = (day: object, profile: object = {}) => ({ ...base, reminders: [], profile: { ...base.profile, startDate: day1, onboarded: true, walkReminders: false, ...profile }, days: { [day1]: { date: day1, quests: {}, ...day } } })
+    const morning = new Date(2026, 0, 1, 5, 0)
+    const water = (s: ReturnType<typeof make>) => buildReminderQueue(s, morning, 1).filter((r) => r.title === 'Water check').map((r) => local(r.fire_at))
+    expect(water(make({ shift: 'day' }))).toEqual(['1 10:00', '1 14:00']) // a third and two thirds through a 6-to-6 shift
+    expect(water(make({ shift: 'night' }))).toEqual(['1 22:00']) // the 2 AM one would fall on the next day
+    expect(water(make({ shift: 'off' }))).toEqual(['1 12:00', '1 17:00'])
+    expect(water(make({ shift: 'day', water: toMl(24, 'oz') }))).toEqual(['1 14:00']) // ahead of the first check
+    expect(water(make({ shift: 'day', water: toMl(48, 'oz') }))).toEqual([])
+    expect(water(make({ shift: 'day', quests: { hydrate: 'x' } }))).toEqual([])
+    expect(water(make({ shift: 'day' }, { waterNudges: false }))).toEqual([])
+    expect(water(make({ shift: 'day', workout: { kind: 'standard', minutes: 30, incline: 12, speed: 3, loggedAt: 'x' } }))).toEqual(['1 10:00', '1 14:00']) // still nudged after the walk
+    expect(buildReminderQueue(make({ shift: 'day' }), morning, 1).find((r) => r.title === 'Water check')!.body).toBe('Aim for about 21 oz by now. You’re at 0.')
   })
 })

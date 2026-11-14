@@ -7,6 +7,8 @@ import { todayKey, addDays, formatDate } from '@/lib/dates'
 import { PageHeader, Card, SectionTitle, Modal } from '@/components/ui'
 import { Download, Upload, Moon, Sun, Monitor, Vibrate, EyeOff, Images } from 'lucide-react'
 import { downloadAllPhotos } from '@/store/photos'
+import { waterSettings, fromMl, toMl, convertWaterSettings, type WaterUnit } from '@/lib/water'
+import { pushConfigured } from '@/store/push'
 import { hapticsSupported, tap } from '@/lib/haptics'
 import { AccountPanel } from '@/components/Account'
 import { useSync, syncConfigured, hasLocalBackup, localBackupJson } from '@/store/sync'
@@ -31,6 +33,16 @@ export default function SettingsPage() {
     setMsg(!r || r.saved === 0 ? 'Your photos couldn’t be fetched. Check your connection and try again.' : r.missed ? `Saved ${r.saved} ${r.saved === 1 ? 'photo' : 'photos'}. ${r.missed} couldn’t be fetched right now.` : `Saved ${r.saved} ${r.saved === 1 ? 'photo' : 'photos'}.`)
   }
   const stats = useStats()
+  const ws = waterSettings(profile)
+  const [goalText, setGoalText] = useState(String(fromMl(ws.goalMl, ws.unit)))
+  const [bottleText, setBottleText] = useState(String(fromMl(ws.bottleMl, ws.unit)))
+  const switchWaterUnit = (u: WaterUnit) => {
+    if (u === ws.unit) return
+    const next = convertWaterSettings(profile, u)
+    setProfile(next)
+    setGoalText(String(fromMl(next.waterGoal!, u))); setBottleText(String(fromMl(next.waterBottle!, u)))
+  }
+  const saveWater = (field: 'waterGoal' | 'waterBottle', text: string) => { const v = parseFloat(text); if (v > 0) setProfile({ [field]: toMl(v, ws.unit) }) }
   const [name, setName] = useState(profile.name)
   const [start, setStart] = useState(profile.startDate ?? todayKey())
   const [resetOpen, setResetOpen] = useState(false)
@@ -80,6 +92,25 @@ export default function SettingsPage() {
             <label className="label">Weight units</label>
             <div className="grid grid-cols-2 gap-2">{(['lb', 'kg'] as const).map((u) => <button key={u} className={profile.units === u ? 'btn-primary' : 'btn-soft'} onClick={() => setProfile({ units: u })}>{u}</button>)}</div>
           </div>
+        </Card>
+      </section>
+
+      <section>
+        <SectionTitle sub="The hydration quest ticks itself when the day’s water reaches your goal.">Hydration</SectionTitle>
+        <Card className="space-y-4">
+          <div>
+            <label className="label">Units</label>
+            <div className="grid grid-cols-2 gap-2">{(['oz', 'ml'] as const).map((u) => <button key={u} className={ws.unit === u ? 'btn-primary' : 'btn-soft'} onClick={() => switchWaterUnit(u)}>{u === 'oz' ? 'Ounces (oz)' : 'Millilitres (ml)'}</button>)}</div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="label">Daily goal ({ws.unit})</label><input type="number" inputMode="decimal" min={1} className="input" aria-label={`Daily water goal in ${ws.unit}`} value={goalText} onChange={(e) => { setGoalText(e.target.value); saveWater('waterGoal', e.target.value) }} /></div>
+            <div><label className="label">My bottle ({ws.unit})</label><input type="number" inputMode="decimal" min={1} className="input" aria-label={`Bottle size in ${ws.unit}`} value={bottleText} onChange={(e) => { setBottleText(e.target.value); saveWater('waterBottle', e.target.value) }} /></div>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm min-w-0"><div className="font-semibold">Hydration nudges</div><div className="text-xs text-muted">{pushConfigured ? 'Up to two reminders a day, only when you’re behind your goal. Needs reminders turned on in the Shift Tracker.' : 'Up to two reminders a day when you’re behind. Available once push reminders are set up.'}</div></div>
+            <button role="switch" aria-checked={ws.nudges} aria-label="Hydration nudges" onClick={() => setProfile({ waterNudges: !ws.nudges })} className={clsx('w-11 h-6 rounded-full relative transition shrink-0', ws.nudges ? 'bg-gradient-to-r from-lavender-500 to-blush-400' : 'bg-line')}><span className={clsx('absolute top-0.5 size-5 rounded-full bg-white shadow transition', ws.nudges ? 'left-5.5' : 'left-0.5')} /></button>
+          </div>
+          <p className="text-xs text-muted">A new goal applies from your next drink. Days already completed stay as they are.</p>
         </Card>
       </section>
 
