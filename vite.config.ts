@@ -10,7 +10,8 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' lets the app choose the moment to switch to a new version (see src/lib/appUpdate.ts).
+      registerType: 'prompt',
       includeAssets: ['icons/*.png', 'icons/*.svg'],
       workbox: { importScripts: ['/push-sw.js'] }, // push reminders
       manifest: {

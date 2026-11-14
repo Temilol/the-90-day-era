@@ -833,3 +833,17 @@ describe('steps', () => {
     expect(useStore.getState().badges['steps-10']).toBeTruthy()
   })
 })
+
+describe('app updates', () => {
+  it('waits for a moment when nothing would be lost', async () => {
+    const { safeToRefresh } = await import('@/lib/appUpdate')
+    const idle = { hidden: false, dialogOpen: false, fieldFocused: false, msSinceTyping: 10 * 60_000, msSinceTouch: 60_000 }
+    expect(safeToRefresh(idle)).toBe(true)
+    expect(safeToRefresh({ ...idle, dialogOpen: true })).toBe(false) // a form or envelope is open
+    expect(safeToRefresh({ ...idle, fieldFocused: true })).toBe(false) // cursor in a field
+    expect(safeToRefresh({ ...idle, msSinceTyping: 30_000 })).toBe(false) // typed half a minute ago
+    expect(safeToRefresh({ ...idle, msSinceTouch: 3_000 })).toBe(false) // tapping around right now
+    expect(safeToRefresh({ ...idle, hidden: true, msSinceTouch: 3_000 })).toBe(true) // just switched away: the best moment
+    expect(safeToRefresh({ ...idle, hidden: true, msSinceTyping: 30_000 })).toBe(false) // switched away mid-entry
+  })
+})

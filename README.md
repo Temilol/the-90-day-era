@@ -43,6 +43,8 @@ Sign-up confirmation and password reset use Supabase's standard emailed links. T
 
 Each account has one row holding the whole saved state plus a version number. A device uploads only if the cloud version is the one it last saw; if both sides changed, the app asks which copy to keep and backs up the other.
 
+The installed app updates itself. It checks for a new version on load, whenever it returns to the foreground, and hourly; `src/lib/appUpdate.ts` then switches to it at a moment when no form is open and nothing is being typed.
+
 Push reminders are optional and need three extra pieces: a key pair from `npm run push:keys`, the `supabase/push.sql` tables and five-minute schedule, and the `supabase/functions/send-reminders` Edge Function with its three secrets. The app writes the coming week of reminder times to `push_reminders`; the function sends whatever is due. The private key and the schedule secret live only in Supabase and in the untracked `push-keys.local` file.
 
 Progress photos are shrunk in the browser and kept in IndexedDB. When signed in they are also copied to a private Supabase Storage bucket, `progress-photos`, in a folder named after the user id. Only a small id and date for each photo travel with the saved state. `supabase/schema.sql` creates the bucket and its access rules, and is safe to run again.
