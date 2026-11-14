@@ -758,3 +758,36 @@ describe('hydration', () => {
     expect(buildReminderQueue(make({ shift: 'day' }), morning, 1).find((r) => r.title === 'Water check')!.body).toBe('Aim for about 21 oz by now. You’re at 0.')
   })
 })
+
+describe('shift quests after the bottle quest was retired', () => {
+  it('has the four new ones, no bottle quest, and only suggests packing a bag before a work day', async () => {
+    const { questsFor } = await import('@/lib/hooks')
+    const { QUEST_POOL } = await import('@/content/quests')
+    const ids = QUEST_POOL.map((q) => q.id)
+    expect(ids).not.toContain('water-bottle')
+    for (const id of ['quiet-break', 'meal-away', 'text-love', 'pack-bag']) expect(ids).toContain(id)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(QUEST_POOL.filter((q) => q.category === 'hydration')).toHaveLength(0) // water is only the tracker now
+    let seen = 0
+    for (let i = 0; i < 200; i++) {
+      const date = addDays('2026-01-01', i)
+      for (const shift of ['day', 'elective', 'off', undefined] as const) {
+        const base = questsFor(date, shift)
+        if (!base.some((q) => q.id === 'pack-bag')) continue
+        seen++
+        expect(questsFor(date, shift, undefined, undefined, 'night').map((q) => q.id)).toEqual(base.map((q) => q.id)) // work tomorrow: unchanged
+        for (const tomorrow of ['off', 'recovery'] as const) {
+          const adjusted = questsFor(date, shift, undefined, undefined, tomorrow)
+          expect(adjusted.map((q) => q.id)).not.toContain('pack-bag')
+          expect(adjusted).toHaveLength(4)
+          expect(new Set(adjusted.map((q) => q.id)).size).toBe(4)
+          expect(adjusted.filter((q, j) => q.id !== base[j].id)).toHaveLength(1) // only that one slot changes
+        }
+        // already ticked off: it stays, whatever tomorrow is
+        expect(questsFor(date, shift, { 'pack-bag': 'x' }, undefined, 'off').map((q) => q.id)).toContain('pack-bag')
+      }
+      for (const shift of ['night', 'recovery'] as const) expect(questsFor(date, shift).map((q) => q.id)).not.toContain('pack-bag')
+    }
+    expect(seen).toBeGreaterThan(5)
+  })
+})

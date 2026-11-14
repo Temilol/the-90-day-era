@@ -354,7 +354,8 @@ export function QuestList({ date, locked }: { date: string; locked?: boolean }) 
   const toggleQuest = useStore((s) => s.toggleQuest)
   const completeBonus = useStore((s) => s.completeBonusMission)
   const clearBonus = useStore((s) => s.clearBonusMission)
-  const quests = questsFor(date, d?.shift, d?.quests, d?.swaps)
+  const tomorrowShift = useStore((s) => s.days[addDays(date, 1)]?.shift)
+  const quests = questsFor(date, d?.shift, d?.quests, d?.swaps, tomorrowShift)
   const swapQuest = useStore((s) => s.swapQuest)
   const swapsLeft = useStore((s) => readyPrizes(s, 'swap', todayKey()).length)
   const canSwap = !locked && swapsLeft > 0 && date === todayKey()
@@ -365,7 +366,7 @@ export function QuestList({ date, locked }: { date: string; locked?: boolean }) 
       {canSwap && <div className="text-xs text-lavender-600 dark:text-lavender-300 px-1">🔁 You have {swapsLeft} quest {swapsLeft === 1 ? 'swap' : 'swaps'}. Tap the swap icon on a quest you’d rather trade.</div>}
       {quests.map((q) => (
         q.id === 'hydrate' ? <HydrationCard key={q.id} date={date} locked={locked} hint={q.hint} /> :
-        <div key={q.id} className="relative">
+        <div key={q.id} className={clsx('relative', canSwap && q.id !== 'hydrate' && !d?.quests?.[q.id] && '[&>button:first-child]:pr-11')}>
           <Check disabled={locked} checked={!!d?.quests?.[q.id]} onChange={() => { toggleQuest(date, q.id); tap(); if (!d?.quests?.[q.id] && doneCount + 1 === quests.length) burst() }} label={q.title} sub={q.hint} emoji={q.emoji} />
           {canSwap && q.id !== 'hydrate' && !d?.quests?.[q.id] && <button onClick={() => { if (swapQuest(date, q.id)) hearts() }} className="absolute right-2 top-2 btn-ghost p-1.5" aria-label={`Swap “${q.title}” for a different quest`}><Repeat size={14} /></button>}
         </div>

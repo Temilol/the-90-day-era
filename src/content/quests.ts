@@ -6,6 +6,7 @@ export interface Quest {
   hint?: string
   fits?: ShiftType[] // especially suited to these kinds of day: one quest a day is drawn from the matching ones
   avoid?: ShiftType[] // can't sensibly be done on these kinds of day: left out of that day's draw
+  beforeWork?: boolean // only makes sense when the next day is a work day: replaced when tomorrow is off or rest
 }
 
 export const HYDRATION_QUEST: Quest = { id: 'hydrate', title: 'Hydration', emoji: '💧', category: 'hydration', hint: 'Ticks itself when you reach your goal.' }
@@ -38,10 +39,13 @@ export const QUEST_POOL: Quest[] = [
   { id: 'tidy', title: 'Clear your treadmill space', emoji: '🧹', category: 'prep', hint: 'Zero friction for tomorrow.', fits: ['off'] },
   { id: 'friend', title: 'Tell someone one win from this week', emoji: '💬', category: 'mind' },
   { id: 'veg-dinner', title: 'Half the plate vegetables at one meal', emoji: '🥦', category: 'nutrition', fits: ['off'] },
-  { id: 'water-bottle', title: 'Finish your bottle before the shift ends', emoji: '🫗', category: 'hydration', fits: ['day', 'night', 'elective'], avoid: ['off', 'recovery'] },
   { id: 'skin', title: 'Full skincare routine, no shortcuts', emoji: '🧴', category: 'selfcare', fits: ['recovery'] },
   { id: 'breathe', title: 'Two minutes of slow breathing', emoji: '🌬️', category: 'selfcare', hint: 'In for four, out for six.', fits: ['recovery'] },
   // shift-specific
+  { id: 'quiet-break', title: 'Two minutes of quiet with your eyes closed on a break', emoji: '😌', category: 'selfcare', fits: ['day', 'night', 'elective'], avoid: ['off', 'recovery'] },
+  { id: 'meal-away', title: 'Eat your meal away from your work station', emoji: '🍽️', category: 'nutrition', fits: ['day', 'night', 'elective'], avoid: ['off', 'recovery'] },
+  { id: 'text-love', title: 'Text someone you love on your break', emoji: '💌', category: 'mind', fits: ['day', 'night', 'elective'], avoid: ['off', 'recovery'] },
+  { id: 'pack-bag', title: 'Pack tomorrow’s bag before bed', emoji: '🎒', category: 'prep', hint: 'One less thing to think about in the morning.', fits: ['day', 'elective'], avoid: ['night', 'recovery'], beforeWork: true },
   { id: 'dark-room', title: 'Make your room properly dark before you sleep', emoji: '🕶️', category: 'sleep', hint: 'Blackout curtains, eye mask, phone face down.', fits: ['night'], avoid: ['day', 'off', 'elective'] },
   { id: 'pre-shift-meal', title: 'Eat a real meal before your shift', emoji: '🍲', category: 'nutrition', hint: 'Not just snacks from the break room.', fits: ['night', 'day'], avoid: ['off', 'recovery'] },
   { id: 'straight-to-bed', title: 'Straight to bed after the shift', emoji: '🛌', category: 'sleep', hint: 'Errands can wait until you’ve slept.', fits: ['night'], avoid: ['day', 'off', 'elective', 'recovery'] },
@@ -54,4 +58,4 @@ export const QUEST_POOL: Quest[] = [
   { id: 'unwind', title: 'Do one thing purely because you enjoy it', emoji: '🎨', category: 'selfcare', fits: ['recovery', 'off'] },
 ]
 
-export const SELF_CARE_IDS = new Set(['selfcare', 'sunlight', 'kindness', 'stretch', 'skin', 'breathe', 'nap', 'outside', 'unwind', 'mobility'])
+export const SELF_CARE_IDS = new Set(['selfcare', 'sunlight', 'kindness', 'stretch', 'skin', 'breathe', 'nap', 'outside', 'unwind', 'mobility', 'quiet-break'])

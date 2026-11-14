@@ -40,9 +40,10 @@ export function useStats() {
  * Daily quests for a date: hydration + 3 rotating, the same every time you look.
  * With a shift set, one of the three is drawn from quests that suit that kind of day, the other two
  * are random, and quests that can't be done on that shift are left out. Quests already ticked off
- * stay on the list even if the shift changes afterwards.
+ * stay on the list even if the shift changes afterwards. Pass tomorrow's shift so quests about
+ * getting ready for work are left out when tomorrow is a day off or a rest day.
  */
-export function questsFor(date: string, shift?: ShiftType, done?: Record<string, string>, swaps?: string[]): Quest[] {
+export function questsFor(date: string, shift?: ShiftType, done?: Record<string, string>, swaps?: string[], tomorrow?: ShiftType): Quest[] {
   let picks: Quest[]
   if (!shift) {
     picks = pickN(QUEST_POOL, 3, seeded(`quests:${date}`))
@@ -53,10 +54,13 @@ export function questsFor(date: string, shift?: ShiftType, done?: Record<string,
     picks = [...fit, ...rest]
   }
   // A quest traded away with a quest-swap prize is replaced by another that suits the day.
-  for (const gone of swaps ?? []) {
+  // So is a getting-ready-for-work quest when there is no work tomorrow.
+  const noWorkTomorrow = tomorrow === 'off' || tomorrow === 'recovery'
+  const replace = [...(swaps ?? []), ...(noWorkTomorrow ? QUEST_POOL.filter((q) => q.beforeWork && !done?.[q.id]).map((q) => q.id) : [])]
+  for (const gone of replace) {
     const i = picks.findIndex((q) => q.id === gone)
     if (i < 0) continue
-    const options = QUEST_POOL.filter((q) => !picks.includes(q) && !(swaps ?? []).includes(q.id) && !(shift && q.avoid?.includes(shift)))
+    const options = QUEST_POOL.filter((q) => !picks.includes(q) && !replace.includes(q.id) && !(shift && q.avoid?.includes(shift)))
     const next = pickN(options, 1, seeded(`swap:${date}:${gone}`))[0]
     if (next) picks[i] = next
   }

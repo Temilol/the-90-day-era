@@ -30,7 +30,7 @@ export default function Dashboard() {
   const celebration = useUi((s) => s.celebration)
   const setCelebration = useUi((s) => s.setCelebration)
   const quote = quoteFor(today)
-  const quests = questsFor(today, d?.shift, d?.quests, d?.swaps)
+  const quests = questsFor(today, d?.shift, d?.quests, d?.swaps, useStore.getState().days[addDays(today, 1)]?.shift)
   const questsDone = quests.filter((q) => d?.quests?.[q.id]).length
   const unopened = Object.values(envelopes).filter((e) => !e.openedAt).length
   const tomorrowKey = addDays(today, 1)
