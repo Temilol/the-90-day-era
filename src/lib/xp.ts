@@ -8,8 +8,13 @@ export const LEVELS: { level: number; title: string; xp: number }[] = [
   { level: 5, title: 'Elite', xp: 1200 },
   { level: 6, title: 'Legend', xp: 1800 },
   { level: 7, title: 'Icon', xp: 2500 },
-  { level: 8, title: 'Era Queen', xp: 3300 },
+  { level: 8, title: 'Unstoppable', xp: 3300 },
+  { level: 9, title: 'Royalty', xp: 4300 },
+  { level: 10, title: 'Era Queen', xp: 5500 },
 ]
+
+export const TOP_LEVEL = LEVELS[LEVELS.length - 1].level
+export const LEVEL_EMOJI = ['🌱', '🧭', '⚔️', '🏅', '💎', '🐉', '🌟', '🔥', '💜', '👑']
 
 export const XP = {
   walkShort: 10, // 5-10 min

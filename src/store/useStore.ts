@@ -6,7 +6,7 @@ import { DEFAULT_ELECTIVE } from '@/lib/walkPlan'
 import { planFill, type FillOptions } from '@/lib/schedule'
 import { waterSettings, goalMet } from '@/lib/water'
 import { todayKey, dayNumber, TOTAL_DAYS, weekOf, chapterOf } from '@/lib/dates'
-import { XP, walkXp, walkKind, levelFor, earnsShiftBonus, ACTIVITY_MIN_MINUTES } from '@/lib/xp'
+import { XP, walkXp, walkKind, levelFor, earnsShiftBonus, ACTIVITY_MIN_MINUTES, LEVEL_EMOJI } from '@/lib/xp'
 import { computeStats } from '@/lib/stats'
 import { DEFAULT_REWARDS, PRICE_REV, FIRST_PRICES } from '@/content/rewards'
 import { diffBonuses, journalLength, BONUS, type Bonus } from '@/lib/bonuses'
@@ -110,7 +110,6 @@ export interface Actions {
 
 export type Store = EraState & Actions
 
-const LEVEL_EMOJI = ['🌱', '🧭', '⚔️', '🏅', '💎', '🐉', '🌟', '👑']
 const lifetimeOf = (s: EraState) => s.xp.reduce((a, e) => a + Math.max(0, e.amount), 0)
 /** Shows the level-up pop-up if the level is higher now than it was. */
 function announceLevel(beforeLevel: number, s: EraState) {

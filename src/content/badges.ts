@@ -1,4 +1,5 @@
 import type { Stats } from '@/lib/stats'
+import { TOP_LEVEL } from '@/lib/xp'
 
 export interface BadgeDef {
   id: string
@@ -51,5 +52,5 @@ export const BADGES: BadgeDef[] = [
   { id: 'envelope-5', name: 'Secret Admirer', emoji: '💌', desc: 'Open 5 mystery envelopes.', group: 'hidden', hidden: true, check: (s) => s.envelopesOpened >= 5 },
   { id: 'nsv-5', name: 'More Than a Number', emoji: '🪄', desc: 'Record 5 non-scale victories.', group: 'hidden', hidden: true, check: (s) => s.nsvs >= 5 },
   { id: 'level-legend', name: 'Legendary', emoji: '🐉', desc: 'Reach Level 6: Legend.', group: 'hidden', hidden: true, check: (s) => s.level.level >= 6 },
-  { id: 'level-queen', name: 'Era Queen', emoji: '👑', desc: 'Reach Level 8, the top of the ladder.', group: 'hidden', hidden: true, check: (s) => s.level.level >= 8 },
+  { id: 'level-queen', name: 'Era Queen', emoji: '👑', desc: 'Reach Level 10, the top of the ladder.', group: 'hidden', hidden: true, check: (s) => s.level.level >= TOP_LEVEL },
 ]
