@@ -35,6 +35,7 @@ export interface JournalEntry {
   victories?: string
   improve?: string
   updatedAt: string
+  qualifiedAt?: string // when the entry first had enough writing to earn journal XP
 }
 
 export interface DayLog {
@@ -125,6 +126,7 @@ export interface EraState {
   spins: Spin[]
   celebrations: Record<string, string>
   prizes: Prize[]
+  priceRev: number // which round of default shop prices this data has had applied
   capsule: Capsule | null
   freezes: Record<string, string> // date -> usedAt; patches a missed day for streak purposes
 }

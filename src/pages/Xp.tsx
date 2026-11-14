@@ -4,6 +4,7 @@ import { LEVELS, XP } from '@/lib/xp'
 import { formatDate } from '@/lib/dates'
 import { PageHeader, Card, Progress, Ring, SectionTitle, Empty } from '@/components/ui'
 import { clsx } from 'clsx'
+import { BONUS } from '@/lib/bonuses'
 
 export default function XpPage() {
   const stats = useStats()
@@ -63,10 +64,17 @@ export default function XpPage() {
         <Card className="text-sm">
           <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
             {[['5–10 min modified walk', XP.walkShort], ['11–20 min modified walk', XP.walkMedium], ['21–30 min walk', XP.walkFull], ['Walk longer than 30 min', XP.walkLong], ['Bonus for any walk on a day or night shift', XP.shiftBonus], ['Other activities adding up to 30+ minutes, once a day', XP.activity], ['10-minute strength session', XP.strength], ['Weekly boss battle', XP.boss], ['Weekly reflection', XP.reflection], ['Planned recovery day', XP.recovery], ['Daily quest', XP.quest], ['Bonus mission from the wheel', XP.bonusMission]].map(([k, v]) => (
-              <div key={k as string} className="flex justify-between border-b border-line py-1.5"><span className="text-muted">{k}</span><span className="font-semibold">+{v} XP</span></div>
+              <div key={k as string} className="flex justify-between gap-3 border-b border-line py-1.5"><span className="text-muted min-w-0">{k}</span><span className="font-semibold shrink-0 whitespace-nowrap">+{v} XP</span></div>
             ))}
           </div>
           <p className="text-xs text-muted mt-3">One workout reward per day. Editing a workout replaces its XP instead of stacking it.</p>
+          <div className="label mt-5">Bonuses</div>
+          <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
+            {([['Streak of 3, 7, 14, 21, 30, 45, 60 and 90 days, once each', `+${Object.values(BONUS.streak)[0]} to +${Object.values(BONUS.streak).slice(-1)[0]}`], ['Five treadmill walks in a challenge week', `+${BONUS.weekWalks}`], ['All four quests in a day', `+${BONUS.fullQuests}`], ['Each badge (hidden ones pay double)', `+${BONUS.badge}`], ['Journal entry, written that day or the next', `+${BONUS.journal}`], ['Weigh-in or progress photo, once a week', `+${BONUS.checkIn}`], ['Non-scale victory, once a week', `+${BONUS.nsv}`], ['Sealing your time capsule', `+${BONUS.capsule}`]] as const).map(([k, v]) => (
+              <div key={k} className="flex justify-between gap-3 border-b border-line py-1.5"><span className="text-muted min-w-0">{k}</span><span className="font-semibold shrink-0 whitespace-nowrap">{v} XP</span></div>
+            ))}
+          </div>
+          <p className="text-xs text-muted mt-3">Bonuses follow what you’ve logged. If something they depend on is removed, the bonus goes with it.</p>
         </Card>
       </section>
 

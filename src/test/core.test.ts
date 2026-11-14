@@ -4,6 +4,10 @@ import { walkXp, levelFor, walkKind } from '@/lib/xp'
 import { computeStats } from '@/lib/stats'
 import { decide, type SyncMeta } from '@/lib/syncLogic'
 import { useStore, initialState } from '@/store/useStore'
+import { isBonusId } from '@/lib/bonuses'
+
+/** XP earned directly by actions, leaving out the bonuses worked out on top (streaks, badges and so on). */
+const baseXp = () => useStore.getState().xp.filter((e) => !isBonusId(e.id)).reduce((n, e) => n + Math.max(0, e.amount), 0)
 
 describe('dates', () => {
   it('computes challenge day from start date', () => {
@@ -57,11 +61,11 @@ describe('store', () => {
     s.logWorkout(start, { minutes: 30, incline: 12, speed: 3 })
     s.logWorkout(start, { minutes: 30, incline: 12, speed: 3 })
     expect(useStore.getState().xp.filter((e) => e.id === `workout:${start}`)).toHaveLength(1)
-    expect(computeStats(useStore.getState(), start).lifetimeXp).toBe(25)
+    expect(baseXp()).toBe(25)
     s.logWorkout(start, { minutes: 15, incline: 12, speed: 3 })
-    expect(computeStats(useStore.getState(), start).lifetimeXp).toBe(15)
+    expect(baseXp()).toBe(15)
     s.removeWorkout(start)
-    expect(computeStats(useStore.getState(), start).lifetimeXp).toBe(0)
+    expect(baseXp()).toBe(0)
   })
   it('quests toggle on/off with XP', () => {
     const s = useStore.getState()
@@ -71,17 +75,21 @@ describe('store', () => {
   })
   it('spending XP does not reduce level progress', () => {
     const s = useStore.getState()
-    for (let i = 0; i < 4; i++) s.logWorkout(addDays(start, i), { minutes: 30, incline: 12, speed: 3 })
-    const today = addDays(start, 3)
+    for (let i = 0; i < 12; i++) s.logWorkout(addDays(start, i), { minutes: 30, incline: 12, speed: 3 })
+    const today = addDays(start, 11)
     let st = computeStats(useStore.getState(), today)
-    expect(st.lifetimeXp).toBe(100); expect(st.level.level).toBe(1)
-    for (let i = 4; i < 6; i++) s.logWorkout(addDays(start, i), { minutes: 30, incline: 12, speed: 3 })
-    st = computeStats(useStore.getState(), addDays(start, 5))
-    expect(st.lifetimeXp).toBe(150); expect(st.level.level).toBe(2)
-    expect(s.buyReward('coffee')).toBe(true)
-    expect(s.buyReward('coffee')).toBe(false)
-    st = computeStats(useStore.getState(), addDays(start, 5))
-    expect(st.spendableXp).toBe(50); expect(st.lifetimeXp).toBe(150); expect(st.level.level).toBe(2)
+    expect(baseXp()).toBe(300)
+    const lifetime = st.lifetimeXp
+    const level = st.level.level
+    expect(lifetime).toBeGreaterThan(300) // bonuses on top
+    expect(st.spendableXp).toBe(lifetime)
+    expect(s.buyReward('coffee')).toBe(true) // 200 XP
+    st = computeStats(useStore.getState(), today)
+    expect(st.spentXp).toBe(200)
+    expect(st.spendableXp).toBe(st.lifetimeXp - 200)
+    expect(st.lifetimeXp).toBeGreaterThanOrEqual(lifetime) // spending never lowers it
+    expect(st.level.level).toBeGreaterThanOrEqual(level)
+    expect(s.buyReward('grand')).toBe(false) // nowhere near 3,200
   })
   it('streak counts recovery days and resets on gaps', () => {
     const s = useStore.getState()
@@ -282,15 +290,15 @@ describe('shifts with impact', () => {
     expect(useStore.getState().days[day1].hours).toBeUndefined()
     s.logWorkout(day1, { minutes: 10, incline: 12, speed: 3 })
     expect(useStore.getState().xp.filter((e) => e.id === `shiftbonus:${day1}`)).toHaveLength(1)
-    expect(computeStats(useStore.getState(), day1).lifetimeXp).toBe(15)
+    expect(baseXp()).toBe(15)
     s.removeWorkout(day1)
-    expect(computeStats(useStore.getState(), day1).lifetimeXp).toBe(0)
+    expect(baseXp()).toBe(0)
   })
   it('leaves walks logged under the old values alone', () => {
     fresh()
     useStore.setState((st) => ({ days: { ...st.days, [day1]: { date: day1, quests: {}, workout: { kind: 'standard', minutes: 30, incline: 12, speed: 3, loggedAt: `${day1}T10:00:00.000Z` } } }, xp: [{ id: `workout:${day1}`, amount: 30, reason: '30-minute walk', date: day1, at: `${day1}T10:00:00.000Z` }] }))
     useStore.getState().setShift(day1, 'day')
-    expect(computeStats(useStore.getState(), day1).lifetimeXp).toBe(30)
+    expect(baseXp()).toBe(30)
   })
   it('fills a schedule, keeps hand-set and logged days, and stays editable', async () => {
     const { planFill } = await import('@/lib/schedule')
@@ -374,7 +382,7 @@ describe('shifts with impact', () => {
     expect(before.calories.byDate[day1]).toBe(650)
     expect(before.calories.walkTotal).toBe(310)
     expect(before.otherActivities).toBe(2)
-    expect(before.lifetimeXp).toBe(15 + 15 + 10) // walk, strength, and the day's one activity award
+    expect(baseXp()).toBe(15 + 15 + 10) // walk, strength, and the day's one activity award
     expect(before.streak).toBe(1)
     s.setWorkoutCalories(day1, undefined)
     s.removeActivity(day1, useStore.getState().days[day1].activities![0].id)
@@ -383,7 +391,7 @@ describe('shifts with impact', () => {
   it('other activities earn 10 XP once a day, for 30 minutes or more, whatever the order', () => {
     fresh()
     const s = useStore.getState()
-    const xp = () => computeStats(useStore.getState(), day1).lifetimeXp
+    const xp = () => baseXp()
     const ids = () => useStore.getState().days[day1].activities!.map((a) => a.id)
     s.addActivity(day1, { name: 'Yoga', minutes: 20 })
     expect(xp()).toBe(0) // too short
@@ -406,7 +414,7 @@ describe('shifts with impact', () => {
   it('short bursts add up: three stair sessions, or one entry topped up, earn the day’s 10 XP', () => {
     fresh()
     const s = useStore.getState()
-    const xp = () => computeStats(useStore.getState(), '2026-01-03').lifetimeXp
+    const xp = () => baseXp()
     const acts = (d: string) => useStore.getState().days[d].activities!
     s.addActivity(day1, { name: 'Stairs', minutes: 10 })
     s.addActivity(day1, { name: 'Stairs', minutes: 10 })
@@ -545,30 +553,30 @@ describe('envelopes: tiers, pick one of three, prizes you keep', () => {
     expect(xpOf(`double:${today}`)).toBe(0) // nothing to double yet
     s.logWorkout(today, { minutes: 30, incline: 12, speed: 3 })
     expect(xpOf(`double:${today}`)).toBe(30) // walk 25 + shift bonus 5
-    expect(computeStats(useStore.getState()).lifetimeXp).toBe(60)
+    expect(baseXp()).toBe(60)
     s.logWorkout(today, { minutes: 10, incline: 12, speed: 3 })
-    expect(computeStats(useStore.getState()).lifetimeXp).toBe(30)
+    expect(baseXp()).toBe(30)
     s.setShift(today, 'off')
-    expect(computeStats(useStore.getState()).lifetimeXp).toBe(20)
+    expect(baseXp()).toBe(20)
     const st = useStore.getState()
     expect(prizeUsed(st.prizes[0], st, today)).toBe(true)
     expect(prizeUsed(st.prizes[1], st, today)).toBe(false)
     s.removeWorkout(today)
-    expect(computeStats(useStore.getState()).lifetimeXp).toBe(0)
+    expect(baseXp()).toBe(0)
     // a double-XP day that never got a walk hands the prize back the next day
     expect(prizeUsed(useStore.getState().prizes[0], useStore.getState(), addDays(today, 1))).toBe(false)
   })
   it('a discount prize lowers one shop price and is then spent', () => {
-    setup({ prizes: [{ id: 'c1', key: 'off20', from: 'day30', wonAt: 'x' }], xp: [{ id: 'seed', amount: 180, reason: 'seed', date: day1, at: 'x' }] })
+    setup({ prizes: [{ id: 'c1', key: 'off20', from: 'day30', wonAt: 'x' }], xp: [{ id: 'seed', amount: 450, reason: 'seed', date: day1, at: 'x' }] })
     const s = useStore.getState()
-    expect(s.buyReward('accessory')).toBe(false) // 200 XP, only 180
-    expect(s.buyReward('accessory', 'c1')).toBe(true) // 160 with 20% off
-    expect(useStore.getState().purchases[0].cost).toBe(160)
+    expect(s.buyReward('accessory')).toBe(false) // 500 XP, only 450
+    expect(s.buyReward('accessory', 'c1')).toBe(true) // 400 with 20% off
+    expect(useStore.getState().purchases[0].cost).toBe(400)
     expect(useStore.getState().prizes[0].usedAt).toBeTruthy()
     expect(useStore.getState().prizes[0].note).toBe('New workout accessory')
-    useStore.setState((st) => ({ xp: [...st.xp, { id: 'more', amount: 90, reason: 'seed', date: day1, at: 'x' }] }))
+    useStore.setState((st) => ({ xp: [...st.xp, { id: 'more', amount: 250, reason: 'seed', date: day1, at: 'x' }] }))
     expect(s.buyReward('coffee', 'c1')).toBe(true) // coupon already spent: full price
-    expect(useStore.getState().purchases[1].cost).toBe(100)
+    expect(useStore.getState().purchases[1].cost).toBe(200)
   })
   it('a quest swap trades one of today’s quests and uses the prize', async () => {
     const { questsFor } = await import('@/lib/hooks')
@@ -684,7 +692,7 @@ describe('secret envelopes', () => {
 describe('hydration', () => {
   const day1 = '2026-01-01'
   const fresh = (profile: object = {}) => useStore.setState({ ...initialState(), profile: { name: 'T', startDate: day1, units: 'lb', onboarded: true, ...profile } })
-  const xp = () => computeStats(useStore.getState(), day1).lifetimeXp
+  const xp = () => baseXp()
   const d = () => useStore.getState().days[day1]
 
   it('defaults to 64 oz, converts tidily, and eight glasses reach the goal', async () => {
@@ -733,7 +741,7 @@ describe('hydration', () => {
     expect(d().quests.hydrate).toBeTruthy()
     // a day ticked by hand before water logging existed keeps its tick and XP
     useStore.setState((st) => ({ days: { ...st.days, '2026-01-02': { date: '2026-01-02', quests: { hydrate: 'x' } } }, xp: [...st.xp, { id: 'quest:2026-01-02:hydrate', amount: 5, reason: 'Daily quest', date: '2026-01-02', at: 'x' }] }))
-    expect(computeStats(useStore.getState(), '2026-01-02').lifetimeXp).toBe(10)
+    expect(baseXp()).toBe(10)
     const stats = computeStats(useStore.getState(), '2026-01-02')
     expect(stats.water).toEqual({ days: 1, totalMl: 1500 })
     expect(stats.questCounts.hydrate).toBe(2)
@@ -845,5 +853,145 @@ describe('app updates', () => {
     expect(safeToRefresh({ ...idle, msSinceTouch: 3_000 })).toBe(false) // tapping around right now
     expect(safeToRefresh({ ...idle, hidden: true, msSinceTouch: 3_000 })).toBe(true) // just switched away: the best moment
     expect(safeToRefresh({ ...idle, hidden: true, msSinceTyping: 30_000 })).toBe(false) // switched away mid-entry
+  })
+})
+
+describe('bonus XP worked out from what she has logged', () => {
+  const day1 = '2026-01-01'
+  const fresh = (start = day1, extra: object = {}) => useStore.setState({ ...initialState(), profile: { name: 'T', startDate: start, units: 'lb', onboarded: true }, ...extra })
+  const xpOf = (id: string) => useStore.getState().xp.find((e) => e.id === id)?.amount ?? 0
+  const walk = (date: string, minutes = 30) => useStore.getState().logWorkout(date, { minutes, incline: 12, speed: 3 })
+
+  it('streak milestones pay once each and follow the streak', () => {
+    fresh()
+    walk(day1); walk('2026-01-02')
+    expect(xpOf('streak:3')).toBe(0)
+    useStore.getState().setRecovery('2026-01-03', true) // a rest day keeps the streak
+    expect(xpOf('streak:3')).toBe(10)
+    for (let i = 3; i < 7; i++) walk(addDays(day1, i))
+    expect([xpOf('streak:3'), xpOf('streak:7'), xpOf('streak:14')]).toEqual([10, 20, 0])
+    expect(useStore.getState().xp.filter((e) => e.id === 'streak:3')).toHaveLength(1)
+    useStore.getState().removeWorkout('2026-01-04') // now the longest run is 3
+    expect([xpOf('streak:3'), xpOf('streak:7')]).toEqual([10, 0])
+  })
+  it('five treadmill walks in a challenge week pay 20; rest days and other activity do not count', () => {
+    fresh()
+    for (let i = 0; i < 4; i++) walk(addDays(day1, i), 10)
+    useStore.getState().setRecovery('2026-01-05', true)
+    useStore.getState().addActivity('2026-01-06', { name: 'Bike', minutes: 60 })
+    expect(xpOf('week5:1')).toBe(0)
+    walk('2026-01-07', 5)
+    expect(xpOf('week5:1')).toBe(20)
+    expect(useStore.getState().xp.find((e) => e.id === 'week5:1')!.date).toBe('2026-01-07')
+    walk('2026-01-06')
+    expect(xpOf('week5:1')).toBe(20) // a sixth walk adds nothing
+    walk('2026-01-08') // week 2 starts fresh
+    expect(xpOf('week5:2')).toBe(0)
+    useStore.getState().removeWorkout('2026-01-01'); useStore.getState().removeWorkout('2026-01-02')
+    expect(xpOf('week5:1')).toBe(0)
+  })
+  it('all four quests in a day pay 5 extra', () => {
+    fresh()
+    const s = useStore.getState()
+    for (const q of ['nourish', 'protein', 'stretch']) s.toggleQuest(day1, q)
+    expect(xpOf(`fullquests:${day1}`)).toBe(0)
+    s.addWater(day1, 2000)
+    expect(xpOf(`fullquests:${day1}`)).toBe(5)
+    s.toggleQuest(day1, 'stretch')
+    expect(xpOf(`fullquests:${day1}`)).toBe(0)
+  })
+  it('badges pay 10 XP, hidden ones 20', async () => {
+    const { BADGES } = await import('@/content/badges')
+    fresh()
+    walk(day1)
+    const held = Object.keys(useStore.getState().badges)
+    expect(held.length).toBeGreaterThan(0)
+    for (const id of held) expect(xpOf(`badge:${id}`)).toBe(BADGES.find((b) => b.id === id)!.hidden ? 20 : 10)
+    useStore.setState((st) => ({ badges: { ...st.badges, 'night-owl': new Date().toISOString() } }))
+    useStore.getState().checkProgress()
+    expect(xpOf('badge:night-owl')).toBe(20)
+  })
+  it('a journal entry pays 5 when it has real writing and was written on its day or the day after', () => {
+    const today = todayKeyForTest()
+    fresh(addDays(today, -10))
+    const s = useStore.getState()
+    s.saveJournal(today, { mood: 'good' })
+    expect(xpOf(`journal:${today}`)).toBe(0) // a mood tap is not writing
+    s.saveJournal(today, { reflection: 'Short.' })
+    expect(xpOf(`journal:${today}`)).toBe(0)
+    s.saveJournal(today, { reflection: 'Felt strong on the incline today.' })
+    expect(xpOf(`journal:${today}`)).toBe(5)
+    s.saveJournal(today, { gratitude: 'A quiet shift.' })
+    expect(useStore.getState().xp.filter((e) => e.id === `journal:${today}`)).toHaveLength(1)
+    const yesterday = addDays(today, -1)
+    s.saveJournal(yesterday, { reflection: 'Writing this the morning after a night shift.' })
+    expect(xpOf(`journal:${yesterday}`)).toBe(5)
+    const old = addDays(today, -5)
+    s.saveJournal(old, { reflection: 'Filling in a day from last week, long after.' })
+    expect(xpOf(`journal:${old}`)).toBe(0)
+    s.saveJournal(today, { reflection: '', gratitude: '' })
+    expect(xpOf(`journal:${today}`)).toBe(0)
+  })
+  it('a journal entry written on time before this update still earns when edited later', () => {
+    const today = todayKeyForTest()
+    const date = addDays(today, -6)
+    fresh(addDays(today, -10), { days: { [date]: { date, quests: {}, journal: { reflection: 'Written on the day, before bonuses existed.', updatedAt: `${date}T20:00:00` } } } })
+    useStore.getState().checkProgress()
+    expect(xpOf(`journal:${date}`)).toBe(5)
+    useStore.getState().saveJournal(date, { gratitude: 'Adding a line a week later.' })
+    expect(xpOf(`journal:${date}`)).toBe(5)
+  })
+  it('one check-in and one victory pay per challenge week, and the time capsule pays once', () => {
+    const today = todayKeyForTest()
+    fresh(addDays(today, -8)) // today is day 9, in week 2
+    const s = useStore.getState()
+    s.addWeight(addDays(today, -8), 180)
+    s.addWeight(addDays(today, -7), 179.5)
+    expect(xpOf('checkin:1')).toBe(10)
+    expect(xpOf('checkin:2')).toBe(0)
+    s.addPhoto(today, 'photo-1')
+    expect(xpOf('checkin:2')).toBe(10)
+    s.removeWeight(addDays(today, -8))
+    expect(xpOf('checkin:1')).toBe(10) // the other weigh-in that week still counts
+    s.removeWeight(addDays(today, -7))
+    expect(xpOf('checkin:1')).toBe(0)
+    s.addNsv('Energy', 'Took the stairs without stopping'); s.addNsv('Sleep', 'Slept through')
+    expect(xpOf('nsv:2')).toBe(5)
+    expect(useStore.getState().xp.filter((e) => e.id.startsWith('nsv:'))).toHaveLength(1)
+    s.sealCapsule('Dear me, you kept going.')
+    expect(xpOf('capsule')).toBe(20)
+  })
+  it('gives past days their bonuses the first time it runs, and settles in one go', () => {
+    const days = Object.fromEntries(Array.from({ length: 8 }, (_, i) => { const date = addDays(day1, i); return [date, { date, quests: { a: 'x', b: 'x', c: 'x', hydrate: 'x' }, workout: { kind: 'standard' as const, minutes: 30, incline: 12, speed: 3, loggedAt: `${date}T10:00:00` } }] }))
+    fresh(day1, { days, weights: [{ date: day1, value: 180 }] })
+    expect(useStore.getState().xp).toHaveLength(0)
+    useStore.getState().checkProgress()
+    expect([xpOf('streak:3'), xpOf('streak:7'), xpOf('week5:1'), xpOf(`fullquests:${day1}`), xpOf('checkin:1')]).toEqual([10, 20, 20, 5, 10])
+    const after = useStore.getState().xp.length
+    useStore.getState().checkProgress()
+    expect(useStore.getState().xp).toHaveLength(after) // nothing more to add or remove
+    for (const id of Object.keys(useStore.getState().badges)) expect(xpOf(`badge:${id}`)).toBeGreaterThan(0)
+  })
+})
+
+describe('shop prices', () => {
+  it('uses the new defaults and moves untouched old prices up once', async () => {
+    const { upgradeData, applySnapshot } = await import('@/store/useStore')
+    const { DEFAULT_REWARDS } = await import('@/content/rewards')
+    expect(DEFAULT_REWARDS.map((r) => r.cost)).toEqual([200, 500, 900, 1300, 1900, 3200])
+    const old = [
+      { id: 'coffee', name: 'Favorite snack or drink treat', cost: 100, emoji: '🧋' },
+      { id: 'accessory', name: 'New workout accessory', cost: 250, emoji: '🎀' }, // she changed this one
+      { id: 'grand', name: 'Special grand prize', cost: 1000, emoji: '👑' },
+      { id: 'c1', name: 'Her own reward', cost: 100, emoji: '🎁', custom: true },
+    ]
+    const up = upgradeData({ rewards: old } as Partial<ReturnType<typeof initialState>>)
+    expect(up.rewards!.map((r) => r.cost)).toEqual([200, 250, 3200, 100])
+    expect(up.priceRev).toBe(2)
+    const lowered = up.rewards!.map((r) => (r.id === 'coffee' ? { ...r, cost: 100 } : r))
+    expect(upgradeData({ ...up, rewards: lowered }).rewards![0].cost).toBe(100) // not bumped a second time
+    applySnapshot({ ...initialState(), priceRev: undefined as unknown as number, rewards: old })
+    expect(useStore.getState().rewards.map((r) => r.cost)).toEqual([200, 250, 3200, 100])
+    expect(useStore.getState().priceRev).toBe(2)
   })
 })

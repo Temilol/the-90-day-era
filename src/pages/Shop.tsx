@@ -66,10 +66,10 @@ export default function Shop() {
           return (
             <div key={r.id} className={clsx('card overflow-hidden', can && 'ring-1 ring-lavender-300')}>
               {r.image && <img src={r.image} alt="" className="w-full h-36 object-cover" />}
-              <div className="p-4 flex items-center gap-4">
-              {!r.image && <div className="size-14 rounded-2xl grid place-items-center text-3xl bg-gradient-to-br from-lavender-100 to-blush-100 dark:from-lavender-500/30 dark:to-blush-500/20">{r.emoji}</div>}
+              <div className="p-4 flex items-center gap-3 sm:gap-4">
+              {!r.image && <div className="size-11 sm:size-14 shrink-0 rounded-2xl grid place-items-center text-2xl sm:text-3xl bg-gradient-to-br from-lavender-100 to-blush-100 dark:from-lavender-500/30 dark:to-blush-500/20">{r.emoji}</div>}
               <div className="flex-1 min-w-0">
-                <div className="font-semibold leading-tight line-clamp-2">{r.image && <span className="mr-1">{r.emoji}</span>}{r.name}</div>
+                <div className="font-semibold leading-tight break-words">{r.image && <span className="mr-1">{r.emoji}</span>}{r.name}</div>
                 <div className="text-xs text-muted">{r.cost} XP{r.budget ? ` · up to $${r.budget}` : ''}{owned ? ` · unlocked ×${owned}` : ''}{!can && ` · about ${walksAway(r.cost - stats.spendableXp)} more walk${walksAway(r.cost - stats.spendableXp) === 1 ? '' : 's'}`}</div>
                 {r.note && <div className="text-xs text-muted italic truncate mt-0.5">{r.note}</div>}
                 {r.link && <a href={r.link} target="_blank" rel="noreferrer" className="text-xs text-lavender-600 dark:text-lavender-300 font-medium inline-flex items-center gap-1 mt-0.5"><ExternalLink size={11} /> Open link</a>}

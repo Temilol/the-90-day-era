@@ -8,7 +8,8 @@ import { waterSettings, goalMet } from '@/lib/water'
 import { todayKey, dayNumber, TOTAL_DAYS, weekOf, chapterOf } from '@/lib/dates'
 import { XP, walkXp, walkKind, levelFor, earnsShiftBonus, ACTIVITY_MIN_MINUTES } from '@/lib/xp'
 import { computeStats } from '@/lib/stats'
-import { DEFAULT_REWARDS } from '@/content/rewards'
+import { DEFAULT_REWARDS, PRICE_REV, FIRST_PRICES } from '@/content/rewards'
+import { diffBonuses, journalLength, BONUS, type Bonus } from '@/lib/bonuses'
 import { BADGES } from '@/content/badges'
 import { BOSSES } from '@/content/bosses'
 import { ENVELOPE_DEFS, prizeDef } from '@/content/envelopes'
@@ -41,6 +42,7 @@ export function initialState(): EraState {
     celebrations: {},
     prizes: [],
     capsule: null,
+    priceRev: PRICE_REV,
     freezes: {},
   }
 }
@@ -107,6 +109,28 @@ export interface Actions {
 }
 
 export type Store = EraState & Actions
+
+const LEVEL_EMOJI = ['🌱', '🧭', '⚔️', '🏅', '💎', '🐉', '🌟', '👑']
+const lifetimeOf = (s: EraState) => s.xp.reduce((a, e) => a + Math.max(0, e.amount), 0)
+/** Shows the level-up pop-up if the level is higher now than it was. */
+function announceLevel(beforeLevel: number, s: EraState) {
+  const after = levelFor(lifetimeOf(s))
+  if (after.level <= beforeLevel) return
+  useUi.getState().pushUnlock({ id: `level-${after.level}`, name: `Level ${after.level}: ${after.title}`, emoji: LEVEL_EMOJI[after.level - 1] ?? '✨', desc: after.next ? `${after.toNext} XP to ${after.next.title}.` : 'Top of the ladder. Nothing left to prove.', kind: 'level' })
+}
+
+/**
+ * Brings saved data from an older round up to date before it is used: untouched default rewards
+ * move to the current prices, once. A price she changed herself is left alone.
+ */
+export function upgradeData<T extends Partial<EraState>>(raw: T): T {
+  if (!raw || (raw.priceRev ?? 1) >= PRICE_REV) return raw
+  const rewards = (raw.rewards ?? []).map((r) => {
+    const def = DEFAULT_REWARDS.find((d) => d.id === r.id)
+    return def && !r.custom && r.cost === FIRST_PRICES[r.id] ? { ...r, cost: def.cost } : r
+  })
+  return { ...raw, rewards: raw.rewards ? rewards : raw.rewards, priceRev: PRICE_REV }
+}
 
 function toast(title: string, sub?: string, kind: 'xp' | 'info' | 'warn' | 'success' = 'xp') {
   useUi.getState().pushToast({ title, sub, kind })
@@ -200,10 +224,7 @@ export const useStore = create<Store>()(
       const mutate = (fn: (s: EraState) => void) => {
         const before = levelFor(lifetime(get())).level
         set((s) => { fn(s) })
-        const after = levelFor(lifetime(get()))
-        if (after.level > before) {
-          useUi.getState().pushUnlock({ id: `level-${after.level}`, name: `Level ${after.level}: ${after.title}`, emoji: ['🌱', '🧭', '⚔️', '🏅', '💎', '🐉', '🌟', '👑'][after.level - 1] ?? '✨', desc: after.next ? `${after.toNext} XP to ${after.next.title}.` : 'Top of the ladder. Nothing left to prove.', kind: 'level' })
-        }
+        announceLevel(before, get())
         get().checkProgress()
       }
       return {
@@ -354,7 +375,12 @@ export const useStore = create<Store>()(
 
         saveJournal: (date, entry) => mutate((s) => {
           const d = day(s, date)
-          d.journal = { ...(d.journal || { updatedAt: '' }), ...entry, updatedAt: new Date().toISOString() }
+          const now = new Date().toISOString()
+          const hadEnough = journalLength(d.journal) >= BONUS.journalMinChars
+          const previous = d.journal?.updatedAt
+          d.journal = { ...(d.journal || { updatedAt: '' }), ...entry, updatedAt: now }
+          // Remember when the entry first had real writing in it; journal XP depends on that being timely.
+          if (!d.journal.qualifiedAt && journalLength(d.journal) >= BONUS.journalMinChars) d.journal.qualifiedAt = hadEnough && previous ? previous : now
         }),
 
         toggleBossTask: (bossId, taskId) => set((s) => {
@@ -457,16 +483,16 @@ export const useStore = create<Store>()(
           const clean = text.trim().slice(0, 4000)
           if (!clean || get().capsule) return
           const stats = computeStats(get())
-          set((s) => { s.capsule = { text: clean, sealedAt: new Date().toISOString(), day: stats.displayDay } })
+          mutate((s) => { s.capsule = { text: clean, sealedAt: new Date().toISOString(), day: stats.displayDay } })
           toast('Letter sealed', 'It comes back to you on Day 90', 'success')
         },
 
-        addWeight: (date, value) => set((s) => { s.weights = [...s.weights.filter((w) => w.date !== date), { date, value }].sort((a, b) => a.date.localeCompare(b.date)) }),
-        removeWeight: (date) => set((s) => { s.weights = s.weights.filter((w) => w.date !== date) }),
-        addPhoto: (date, id) => set((s) => { s.photos = [...(s.photos ?? []).filter((p) => p.date !== date), { id, date, addedAt: new Date().toISOString() }].sort((a, b) => a.date.localeCompare(b.date)) }),
-        removePhoto: (id) => set((s) => { s.photos = (s.photos ?? []).filter((p) => p.id !== id) }),
+        addWeight: (date, value) => mutate((s) => { s.weights = [...s.weights.filter((w) => w.date !== date), { date, value }].sort((a, b) => a.date.localeCompare(b.date)) }),
+        removeWeight: (date) => mutate((s) => { s.weights = s.weights.filter((w) => w.date !== date) }),
+        addPhoto: (date, id) => mutate((s) => { s.photos = [...(s.photos ?? []).filter((p) => p.date !== date), { id, date, addedAt: new Date().toISOString() }].sort((a, b) => a.date.localeCompare(b.date)) }),
+        removePhoto: (id) => mutate((s) => { s.photos = (s.photos ?? []).filter((p) => p.id !== id) }),
         addNsv: (category, text) => mutate((s) => { s.nsvs.unshift({ id: `n${Date.now()}`, date: todayKey(), category, text }) }),
-        removeNsv: (id) => set((s) => { s.nsvs = s.nsvs.filter((n) => n.id !== id) }),
+        removeNsv: (id) => mutate((s) => { s.nsvs = s.nsvs.filter((n) => n.id !== id) }),
         upsertReminder: (r) => set((s) => { const i = s.reminders.findIndex((x) => x.id === r.id); if (i >= 0) s.reminders[i] = r; else s.reminders.push(r) }),
         removeReminder: (id) => set((s) => { s.reminders = s.reminders.filter((x) => x.id !== id) }),
         recordSpin: (category, result) => mutate((s) => { s.spins.push({ at: new Date().toISOString(), category, result }) }),
@@ -493,8 +519,13 @@ export const useStore = create<Store>()(
         removeFreeze: (date) => mutate((s) => { delete s.freezes[date] }),
 
         checkProgress: () => {
+          // Badges pay XP, and XP can unlock level badges, so go round until nothing more changes.
+          const gained: Bonus[] = []
+          const levelBefore = levelFor(lifetimeOf(get())).level
+          for (let pass = 0; pass < 6; pass++) {
           const before = get()
           const stats = computeStats(before)
+          const bonus = diffBonuses(before, stats)
           const newBadges = BADGES.filter((b) => !before.badges[b.id] && b.check(stats))
           const newEnvelopes = ENVELOPE_DEFS.filter((e) => {
             if (before.envelopes[e.id]) return false
@@ -504,20 +535,29 @@ export const useStore = create<Store>()(
             if (t.type === 'secret') return stats.secrets[t.key]
             return stats.bestStreak >= t.value
           })
-          if (!newBadges.length && !newEnvelopes.length) return
+          if (!newBadges.length && !newEnvelopes.length && !bonus.add.length && !bonus.remove.length && !bonus.change.length) break
           set((s) => {
             const now = new Date().toISOString()
             for (const b of newBadges) s.badges[b.id] = now
             for (const e of newEnvelopes) s.envelopes[e.id] = { id: e.id, unlockedAt: now }
+            for (const id of bonus.remove) revoke(s, id)
+            for (const b of bonus.change) { const e = s.xp.find((x) => x.id === b.id); if (e) e.amount = b.amount }
+            for (const b of bonus.add) award(s, b.id, b.amount, b.reason, b.date)
           })
+          gained.push(...bonus.add)
           const ui = useUi.getState()
           for (const b of newBadges) ui.pushUnlock({ id: b.id, name: b.name, emoji: b.emoji, desc: b.desc, kind: 'badge' })
           for (const e of newEnvelopes) ui.pushToast({ title: e.trigger.type === 'secret' ? 'You found a secret envelope' : 'Mystery envelope unlocked', sub: e.title, kind: 'success' })
+          }
+          // One line each for a bonus or two; a single summary when a lot arrive together (the first run over past days).
+          if (gained.length > 0 && gained.length <= 3) for (const b of gained) toast(`+${b.amount} XP`, b.reason)
+          else if (gained.length > 3) toast(`+${gained.reduce((a, b) => a + b.amount, 0)} XP`, `${gained.length} bonuses for what you’ve already done`, 'success')
+          announceLevel(levelBefore, get())
         },
 
         importData: (raw) => {
           try {
-            const data = JSON.parse(raw)
+            const data = upgradeData(JSON.parse(raw))
             if (!data || typeof data !== 'object' || !data.profile || !data.days) return { ok: false, error: 'That file doesn’t look like a 90-Day Era export.' }
             const base = initialState()
             set(() => ({ ...base, ...data, photos: Array.isArray(data.photos) ? data.photos : [], prizes: Array.isArray(data.prizes) ? data.prizes : [], capsule: data.capsule ?? null, version: STATE_VERSION }))
@@ -533,7 +573,7 @@ export const useStore = create<Store>()(
       name: 'era-data',
       version: STATE_VERSION,
       merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<EraState>
+        const p = upgradeData((persisted ?? {}) as Partial<EraState>)
         const merged = { ...current, ...p } as Store
         if (!Array.isArray(merged.photos)) merged.photos = []
         if (!Array.isArray(merged.prizes)) merged.prizes = []
@@ -568,8 +608,10 @@ export function snapshot(): EraState {
 }
 
 /** Replace all saved data with a copy from elsewhere (cloud sync). Missing fields fall back to defaults. */
-export function applySnapshot(data: Partial<EraState>) {
+export function applySnapshot(incoming: Partial<EraState>) {
+  const data = upgradeData(incoming)
   useStore.setState({ ...initialState(), ...data, photos: Array.isArray(data.photos) ? data.photos : [], prizes: Array.isArray(data.prizes) ? data.prizes : [], capsule: data.capsule ?? null, version: STATE_VERSION })
+  useStore.getState().checkProgress()
 }
 
 export function exportJson(): string {
