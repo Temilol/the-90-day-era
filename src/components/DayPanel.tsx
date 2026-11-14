@@ -78,7 +78,7 @@ function WalkCalories({ date, locked }: { date: string; locked?: boolean }) {
   )
 }
 
-const ACTIVITY_IDEAS = ['Stairs', 'Bike', 'Run', 'Swim', 'Yoga', 'Class', 'Sport', 'Hike']
+const ACTIVITY_IDEAS = ['Stairs', 'Short walk', 'Bike', 'Run', 'Swim', 'Yoga', 'Class', 'Sport', 'Hike']
 const ADD_MINUTES = 5
 
 /** Anything else you did. Thirty minutes in total earns a little XP, once a day. The streak stays about the walk. */
@@ -125,7 +125,7 @@ function OtherActivities({ date, locked }: { date: string; locked?: boolean }) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><label className="label">Minutes</label><input type="number" inputMode="numeric" min={0} max={600} className="input" value={mins} onChange={(e) => setMins(e.target.value)} /></div>
-            <div><label className="label">Calories (optional)</label><input type="number" inputMode="numeric" min={1} max={5000} className="input" placeholder="From your watch" value={cal} onChange={(e) => setCal(e.target.value)} /></div>
+            <div><label className="label">Calories</label><input type="number" inputMode="numeric" min={1} max={5000} className="input" placeholder="Optional" aria-label="Calories burned, optional" value={cal} onChange={(e) => setCal(e.target.value)} /></div>
           </div>
           <button className="btn-primary w-full py-3" disabled={!name.trim()} onClick={save}>Save activity{wouldEarn ? ` (+${XP.activity} XP)` : ''}</button>
           {earned && <p className="text-xs text-muted text-center">Today’s activity XP is already earned. This one is still recorded.</p>}
@@ -276,7 +276,7 @@ export function WorkoutCard({ date, locked }: { date: string; locked?: boolean }
           <div><label className="label">Minutes</label>
             <div className="flex gap-2 flex-wrap">{[5, 10, 15, 20, 30].map((m) => <button key={m} onClick={() => setStrengthMin(m)} className={clsx('chip', strengthMin === m ? 'bg-lavender-500 text-white' : 'bg-card-2 text-muted')}>{m} min</button>)}</div>
           </div>
-          <div><label className="label">Calories burned (optional)</label><input type="number" inputMode="numeric" min={1} max={5000} className="input" placeholder="From your watch, if you track it" value={strengthCal} onChange={(e) => setStrengthCal(e.target.value)} /></div>
+          <div><label className="label">Calories burned (optional)</label><input type="number" inputMode="numeric" min={1} max={5000} className="input" placeholder="From your watch" value={strengthCal} onChange={(e) => setStrengthCal(e.target.value)} /></div>
           <div className="flex gap-2">
             {d?.strength && <button className="btn-danger" onClick={() => { removeStrength(date); setStrengthOpen(false) }}>Remove</button>}
             <button className="btn-primary flex-1" onClick={() => { logStrength(date, strengthMin, d?.strength?.notes, strengthCal.trim() ? parseFloat(strengthCal) : undefined); setStrengthOpen(false); hearts() }}>{d?.strength ? 'Update' : 'Log session'}</button>
