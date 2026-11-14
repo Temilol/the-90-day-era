@@ -411,7 +411,7 @@ export function QuestList({ date, locked }: { date: string; locked?: boolean }) 
         </div>
       ))}
       {d?.bonusMission && (
-        <div className="relative">
+        <div className={clsx('relative', !d.bonusMission.done && !locked && '[&>button:first-child]:pr-14')}>
           <Check disabled={locked || !!d.bonusMission.done} checked={!!d.bonusMission.done} onChange={() => { completeBonus(date); hearts() }} label={d.bonusMission.text} sub={`Bonus mission · ${d.bonusMission.source} · +${XP.bonusMission} XP`} emoji="🎡" />
           {!d.bonusMission.done && !locked && <button onClick={() => clearBonus(date)} className="absolute right-2 top-2 btn-ghost p-1.5 text-xs">Skip</button>}
         </div>
