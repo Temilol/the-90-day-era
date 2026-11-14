@@ -4,6 +4,7 @@ import { Layout } from './components/Layout'
 import { useStore } from './store/useStore'
 import { useSync } from './store/sync'
 import './store/photos' // keeps progress photos backed up in the background
+import './store/push' // keeps the server's list of upcoming reminders current
 import { EmailLinkLanding } from './components/Account'
 import Onboarding from './pages/Onboarding'
 import Dashboard from './pages/Dashboard'

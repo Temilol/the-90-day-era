@@ -5,11 +5,58 @@ import { todayKey, addDays, formatDate, dateForDay, parseKey, TOTAL_DAYS } from 
 import { planFill, MAX_FILL_DAYS } from '@/lib/schedule'
 import { DEFAULT_ELECTIVE } from '@/lib/walkPlan'
 import { useUi } from '@/store/ui'
+import { usePush, pushConfigured } from '@/store/push'
 import { SHIFTS } from '@/components/DayPanel'
 import { PageHeader, Card, SectionTitle, Modal } from '@/components/ui'
 import { notificationsSupported, requestNotifications } from '@/lib/reminders'
 import type { Reminder, ShiftHours, ShiftType } from '@/lib/types'
-import { Bell, Plus, Trash2, CalendarRange, X } from 'lucide-react'
+import { Bell, BellRing, Plus, Trash2, CalendarRange, X } from 'lucide-react'
+
+const Toggle = ({ on, onChange, label }: { on: boolean; onChange: () => void; label: string }) => (
+  <button role="switch" aria-checked={on} aria-label={label} onClick={onChange} className={clsx('w-11 h-6 rounded-full relative transition shrink-0', on ? 'bg-gradient-to-r from-lavender-500 to-blush-400' : 'bg-line')}><span className={clsx('absolute top-0.5 size-5 rounded-full bg-white shadow transition', on ? 'left-5.5' : 'left-0.5')} /></button>
+)
+
+/** Reminders that reach the phone with the app closed. */
+function PushPanel() {
+  const status = usePush((s) => s.status)
+  const busy = usePush((s) => s.busy)
+  const message = usePush((s) => s.message)
+  const enable = usePush((s) => s.enable)
+  const disable = usePush((s) => s.disable)
+  const test = usePush((s) => s.test)
+  const walkReminders = useStore((s) => s.profile.walkReminders !== false)
+  const setProfile = useStore((s) => s.setProfile)
+  const explain: Record<string, string> = {
+    'needs-install': 'On an iPhone, add the app to your Home Screen first: in Safari tap Share, then “Add to Home Screen”. Open it from the new icon and come back here.',
+    unsupported: 'This browser can’t receive reminders while the app is closed.',
+    'signed-out': 'Sign in from Settings to get reminders with the app closed.',
+    blocked: 'Notifications are blocked for this app. Allow them in your device or browser settings, then come back here.',
+    off: 'Get your reminders even when the app is closed.',
+    on: 'On for this device. Reminders arrive even when the app is closed.',
+  }
+  return (
+    <div className="rounded-2xl bg-card-2 p-3 space-y-3">
+      <div className="flex items-center gap-3">
+        <BellRing size={18} className={clsx('shrink-0', status === 'on' ? 'text-lavender-500' : 'text-muted')} />
+        <div className="flex-1 text-sm"><div className="font-semibold">Reminders on this device</div><div className="text-xs text-muted">{explain[status]}</div></div>
+        {status === 'off' && <button className="btn-primary !py-1.5 shrink-0" disabled={busy} onClick={() => void enable()}>{busy ? '…' : 'Turn on'}</button>}
+      </div>
+      {status === 'on' && (
+        <>
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <div><div className="font-medium">Before each walk window</div><div className="text-xs text-muted">A nudge 15 minutes before the times in your walk plan. Skipped once you’ve walked or rested.</div></div>
+            <Toggle on={walkReminders} onChange={() => setProfile({ walkReminders: !walkReminders })} label="Remind me before each walk window" />
+          </div>
+          <div className="flex gap-2">
+            <button className="btn-soft !py-1.5 flex-1" disabled={busy} onClick={() => void test()}>{busy ? 'Working…' : 'Send a test'}</button>
+            <button className="btn-ghost !py-1.5 text-muted" disabled={busy} onClick={() => void disable()}>Turn off</button>
+          </div>
+        </>
+      )}
+      {message && <div role="status" className="text-xs text-lavender-600 dark:text-lavender-300">{message}</div>}
+    </div>
+  )
+}
 
 /** Fill a run of dates in one go: pick the dates, build the repeating pattern, check the preview. */
 function ScheduleFill({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -153,9 +200,10 @@ export default function Shifts() {
       </Card>
 
       <section>
-        <SectionTitle sub="A visible schedule, plus a notification while the app is open or installed on your home screen." action={<button className="btn-soft !py-1.5" onClick={() => setEdit({ id: `r${Date.now()}`, label: 'Walk time', time: '09:00', shifts: [], enabled: true })}><Plus size={14} /> Add</button>}>Workout reminders</SectionTitle>
+        <SectionTitle sub={pushConfigured ? 'Your own reminder times, plus a nudge before each walk window.' : 'A visible schedule, plus a notification while the app is open.'} action={<button className="btn-soft !py-1.5" onClick={() => setEdit({ id: `r${Date.now()}`, label: 'Walk time', time: '09:00', shifts: [], enabled: true })}><Plus size={14} /> Add</button>}>Workout reminders</SectionTitle>
         <Card className="space-y-3">
-          <div className="flex items-center justify-between gap-3 rounded-2xl bg-card-2 p-3 text-sm">
+          {pushConfigured && <PushPanel />}
+          <div className={clsx('flex items-center justify-between gap-3 rounded-2xl bg-card-2 p-3 text-sm', pushConfigured && 'hidden')}>
             <div className="flex items-center gap-2"><Bell size={16} className="text-lavender-500" /><span>Notifications: <b>{perm === 'granted' ? 'on' : perm === 'denied' ? 'blocked in browser settings' : perm === 'unsupported' ? 'not supported here' : 'not enabled'}</b></span></div>
             {perm === 'default' && <button className="btn-primary !py-1.5" onClick={async () => setPerm(await requestNotifications())}>Enable</button>}
           </div>
@@ -170,7 +218,7 @@ export default function Shifts() {
               <button className="btn-ghost p-1.5" onClick={() => remove(r.id)}><Trash2 size={14} /></button>
             </div>
           ))}
-          <p className="text-xs text-muted">Reminders fire on days whose logged shift matches. If a day has no shift logged, every enabled reminder fires. Install the app from your browser menu for the best experience.</p>
+          <p className="text-xs text-muted">Each reminder fires on days whose shift matches. If a day has no shift, every enabled reminder fires. {pushConfigured ? 'Changes reach your phone within a few seconds while you’re online.' : 'Install the app from your browser menu for the best experience.'}</p>
         </Card>
       </section>
 

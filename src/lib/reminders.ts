@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useStore } from '@/store/useStore'
 import { useUi } from '@/store/ui'
 import { todayKey } from './dates'
+import { pushOnHere } from '@/store/push'
 
 export function notificationsSupported() { return typeof Notification !== 'undefined' }
 export async function requestNotifications(): Promise<NotificationPermission | 'unsupported'> {
@@ -26,7 +27,8 @@ export function useReminders() {
         if (fired.has(key)) continue
         fired.add(key)
         const body = 'Incline 12 · 3 mph · 30 min. Or a shorter one, your call.'
-        if (notificationsSupported() && Notification.permission === 'granted') {
+        // With push on, the same reminder arrives from the server, so don't show it twice.
+        if (!pushOnHere() && notificationsSupported() && Notification.permission === 'granted') {
           try { new Notification(r.label, { body, icon: '/icons/icon-192.png' }) } catch { /* ignore */ }
         }
         useUi.getState().pushToast({ title: r.label, sub: body, kind: 'info' })

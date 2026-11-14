@@ -97,7 +97,7 @@ export interface Spin { at: string; category: string; result: string }
 
 export interface EraState {
   version: number
-  profile: { name: string; startDate: string | null; units: 'lb' | 'kg'; onboarded: boolean }
+  profile: { name: string; startDate: string | null; units: 'lb' | 'kg'; onboarded: boolean; walkReminders?: boolean /* remind before each walk window; on unless set to false */ }
   days: Record<string, DayLog>
   xp: XpEntry[]
   purchases: Purchase[]

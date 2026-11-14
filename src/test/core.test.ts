@@ -392,3 +392,36 @@ describe('shifts with impact', () => {
     expect(st.byShift.off).toEqual({ days: 1, walks: 1, minutes: 20 })
   })
 })
+
+describe('push reminder queue', () => {
+  it('queues a nudge before each walk window and matching custom reminders, and skips finished days', async () => {
+    const { buildReminderQueue } = await import('@/lib/reminderQueue')
+    const base = initialState()
+    const state = {
+      ...base,
+      profile: { ...base.profile, startDate: '2026-01-01', onboarded: true },
+      reminders: [
+        { id: 'a', label: 'Night walk', time: '16:00', shifts: ['night' as const], enabled: true },
+        { id: 'b', label: 'Off', time: '10:00', shifts: ['off' as const], enabled: false },
+      ],
+      days: {
+        '2026-01-01': { date: '2026-01-01', quests: {}, shift: 'day' as const },
+        '2026-01-02': { date: '2026-01-02', quests: {}, shift: 'night' as const },
+        '2026-01-03': { date: '2026-01-03', quests: {}, shift: 'night' as const, recovery: true },
+        '2026-01-04': { date: '2026-01-04', quests: {}, shift: 'recovery' as const },
+      },
+    }
+    const now = new Date(2026, 0, 1, 12, 0) // midday on Day 1: the morning window has gone
+    const local = (iso: string) => { const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}` }
+    const q = buildReminderQueue(state, now)
+    expect(q.map((r) => [local(r.fire_at), r.title])).toEqual([
+      ['1/1 18:30', 'Walk window opens at 6:45 PM'],
+      ['1/2 15:15', 'Walk window opens at 3:30 PM'],
+      ['1/2 16:00', 'Night walk'],
+      // days with no shift set get every enabled reminder
+      ['1/5 16:00', 'Night walk'], ['1/6 16:00', 'Night walk'], ['1/7 16:00', 'Night walk'],
+    ])
+    expect(buildReminderQueue({ ...state, profile: { ...state.profile, walkReminders: false } }, now).map((r) => r.title)).toEqual(['Night walk', 'Night walk', 'Night walk', 'Night walk'])
+    expect(buildReminderQueue({ ...state, profile: { ...state.profile, startDate: null } }, now)).toEqual([])
+  })
+})

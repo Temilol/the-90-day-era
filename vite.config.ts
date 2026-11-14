@@ -12,6 +12,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/*.png', 'icons/*.svg'],
+      workbox: { importScripts: ['/push-sw.js'] }, // push reminders
       manifest: {
         name: 'The 90-Day Era',
         short_name: '90-Day Era',
