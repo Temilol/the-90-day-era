@@ -22,7 +22,7 @@ export interface StrengthSession {
   loggedAt: string
 }
 
-/** Any other exercise. Recorded for stats only: it earns no XP and doesn't affect the streak. */
+/** Any other exercise. A day with one of 30 minutes or more earns a small XP award, once. It never affects the streak. */
 export interface Activity { id: string; name: string; minutes: number; calories?: number; loggedAt: string }
 
 export interface JournalEntry {

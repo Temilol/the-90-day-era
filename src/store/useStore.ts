@@ -5,7 +5,7 @@ import type { DayLog, EraState, JournalEntry, Reminder, Reward, ShiftHours, Shif
 import { DEFAULT_ELECTIVE } from '@/lib/walkPlan'
 import { planFill, type FillOptions } from '@/lib/schedule'
 import { todayKey, dayNumber, TOTAL_DAYS, weekOf, chapterOf } from '@/lib/dates'
-import { XP, walkXp, walkKind, levelFor, earnsShiftBonus } from '@/lib/xp'
+import { XP, walkXp, walkKind, levelFor, earnsShiftBonus, ACTIVITY_MIN_MINUTES } from '@/lib/xp'
 import { computeStats } from '@/lib/stats'
 import { DEFAULT_REWARDS } from '@/content/rewards'
 import { BADGES } from '@/content/badges'
@@ -139,6 +139,19 @@ function syncDouble(s: EraState, date: string) {
   const amount = (s.xp.find((e) => e.id === `workout:${date}`)?.amount ?? 0) + (s.xp.find((e) => e.id === `shiftbonus:${date}`)?.amount ?? 0)
   award(s, id, amount, 'Double XP day', date)
 }
+/**
+ * Other activities earn XP once per day, as long as at least one of them is long enough.
+ * The award belongs to the day, so removing one activity keeps it while another still qualifies.
+ * Returns true when it was newly added.
+ */
+function syncActivityXp(s: EraState, date: string): boolean {
+  const id = `activity:${date}`
+  const had = s.xp.some((e) => e.id === id)
+  const earned = (s.days[date]?.activities ?? []).some((a) => a.minutes >= ACTIVITY_MIN_MINUTES)
+  if (!earned) { revoke(s, id); return false }
+  if (!had) award(s, id, XP.activity, 'Other activity', date)
+  return !had
+}
 const cleanCalories = (n: number | undefined) => (typeof n === 'number' && isFinite(n) && n > 0 ? Math.round(n) : undefined)
 function lastElectiveHours(s: EraState): ShiftHours {
   const found = Object.values(s.days).filter((d) => d.shift === 'elective' && d.hours).sort((a, b) => b.date.localeCompare(a.date))[0]
@@ -209,9 +222,13 @@ export const useStore = create<Store>()(
         setWorkoutCalories: (date, calories) => set((s) => { const w = s.days[date]?.workout; if (!w) return; const c = cleanCalories(calories); if (c) w.calories = c; else delete w.calories }),
         addActivity: (date, a) => {
           if (!inChallenge(get(), date) || !a.name.trim()) return
-          set((s) => { const d = day(s, date); (d.activities ||= []).push({ id: `a${Date.now().toString(36)}`, name: a.name.trim().slice(0, 40), minutes: Math.max(0, Math.round(a.minutes) || 0), calories: cleanCalories(a.calories), loggedAt: new Date().toISOString() }) })
+          mutate((s) => {
+            const d = day(s, date)
+            ;(d.activities ||= []).push({ id: `a${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name: a.name.trim().slice(0, 40), minutes: Math.max(0, Math.round(a.minutes) || 0), calories: cleanCalories(a.calories), loggedAt: new Date().toISOString() })
+            if (syncActivityXp(s, date)) toast(`+${XP.activity} XP`, 'Activity logged. That counts.')
+          })
         },
-        removeActivity: (date, id) => set((s) => { const d = s.days[date]; if (d?.activities) d.activities = d.activities.filter((x) => x.id !== id) }),
+        removeActivity: (date, id) => mutate((s) => { const d = s.days[date]; if (d?.activities) { d.activities = d.activities.filter((x) => x.id !== id); syncActivityXp(s, date) } }),
 
         logWorkout: (date, w) => {
           if (!inChallenge(get(), date)) return

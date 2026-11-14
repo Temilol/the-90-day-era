@@ -359,7 +359,7 @@ describe('shifts with impact', () => {
     expect(usualWalkTime(days, 'night')).toBe(16 * 60 + 10)
     expect(usualWalkTime(days, 'day')).toBeNull()
   })
-  it('totals calories from typed numbers only, and other activities earn no XP', () => {
+  it('totals calories from typed numbers only', () => {
     fresh()
     const s = useStore.getState()
     s.logWorkout(day1, { minutes: 30, incline: 12, speed: 3 })
@@ -374,11 +374,34 @@ describe('shifts with impact', () => {
     expect(before.calories.byDate[day1]).toBe(650)
     expect(before.calories.walkTotal).toBe(310)
     expect(before.otherActivities).toBe(2)
-    expect(before.lifetimeXp).toBe(15 + 15) // walk + strength only
+    expect(before.lifetimeXp).toBe(15 + 15 + 10) // walk, strength, and the day's one activity award
     expect(before.streak).toBe(1)
     s.setWorkoutCalories(day1, undefined)
     s.removeActivity(day1, useStore.getState().days[day1].activities![0].id)
     expect(computeStats(useStore.getState(), day1).calories.total).toBe(60)
+  })
+  it('other activities earn 10 XP once a day, for 30 minutes or more, whatever the order', () => {
+    fresh()
+    const s = useStore.getState()
+    const xp = () => computeStats(useStore.getState(), day1).lifetimeXp
+    const ids = () => useStore.getState().days[day1].activities!.map((a) => a.id)
+    s.addActivity(day1, { name: 'Yoga', minutes: 20 })
+    expect(xp()).toBe(0) // too short
+    s.addActivity(day1, { name: 'Swim', minutes: 40 })
+    s.addActivity(day1, { name: 'Bike', minutes: 45 })
+    s.addActivity(day1, { name: 'Hike', minutes: 90 })
+    expect(xp()).toBe(10) // once, however many qualify
+    expect(useStore.getState().xp.filter((e) => e.id === `activity:${day1}`)).toHaveLength(1)
+    expect(new Set(ids()).size).toBe(4)
+    s.removeActivity(day1, ids()[1]) // the swim goes; bike and hike still qualify
+    expect(xp()).toBe(10)
+    s.removeActivity(day1, ids()[1]); s.removeActivity(day1, ids()[1])
+    expect(ids()).toHaveLength(1) // only the short yoga is left
+    expect(xp()).toBe(0)
+    s.addActivity('2026-01-02', { name: 'Run', minutes: 30 })
+    expect(xp()).toBe(10) // a new day earns its own
+    const st = computeStats(useStore.getState(), '2026-01-02')
+    expect(st.streak).toBe(0) // activities never count toward the streak
   })
   it('counts walks by kind of day', () => {
     fresh()
