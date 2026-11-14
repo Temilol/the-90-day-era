@@ -54,7 +54,7 @@ export const QUEST_POOL: Quest[] = [
   { id: 'batch-cook', title: 'Cook once for your next two shifts', emoji: '🥘', category: 'prep', fits: ['off'], avoid: ['day', 'night', 'elective', 'recovery'] },
   { id: 'outside', title: 'Spend 20 minutes outside', emoji: '🌳', category: 'selfcare', fits: ['off'], avoid: ['day', 'night'] },
   { id: 'plan-walks', title: 'Look at the week ahead and pick your walk times', emoji: '🗓️', category: 'prep', fits: ['off', 'elective'] },
-  { id: 'mobility', title: 'Gentle mobility: hips, calves, ankles', emoji: '🦶', category: 'movement', hint: 'Five slow minutes. Nothing that feels like work.', fits: ['recovery', 'off'] },
+  { id: 'mobility', title: 'Loosen up: 5 slow minutes for hips, calves and ankles', emoji: '🦶', category: 'movement', hint: 'Hip circles, a calf stretch on the wall, ankle rolls. Nothing that feels like work.', fits: ['recovery', 'off'] },
   { id: 'unwind', title: 'Do one thing purely because you enjoy it', emoji: '🎨', category: 'selfcare', fits: ['recovery', 'off'] },
 ]
 
