@@ -3,7 +3,7 @@ import { clsx } from 'clsx'
 import { motion } from 'framer-motion'
 import { useStore } from '@/store/useStore'
 import { questsFor, themeFor } from '@/lib/hooks'
-import { walkXp, XP, earnsShiftBonus, ACTIVITY_MIN_MINUTES } from '@/lib/xp'
+import { walkXp, XP, earnsShiftBonus, ACTIVITY_MIN_MINUTES, stepGoalOf } from '@/lib/xp'
 import { DEFAULT_ELECTIVE } from '@/lib/walkPlan'
 import type { ShiftType } from '@/lib/types'
 import { THEMES } from '@/content/themes'
@@ -11,7 +11,7 @@ import { Check, Modal, Progress } from './ui'
 import { waterSettings, fromMl, toMl, goalMet } from '@/lib/water'
 import { burst, hearts } from './Celebrate'
 import { tap } from '@/lib/haptics'
-import { Shuffle, Trash2, Flame, Plus, X, Repeat } from 'lucide-react'
+import { Shuffle, Trash2, Flame, Plus, X, Repeat, Footprints } from 'lucide-react'
 import { readyPrizes } from '@/lib/prizes'
 import { todayKey, addDays, dayNumber } from '@/lib/dates'
 
@@ -74,6 +74,44 @@ function WalkCalories({ date, locked }: { date: string; locked?: boolean }) {
     <form className="flex items-center gap-2 rounded-2xl bg-card-2 p-2.5" onSubmit={(e) => { e.preventDefault(); setCalories(date, value.trim() ? parseFloat(value) : undefined); setEditing(false); setValue('') }}>
       <Flame size={18} className="text-peach-400 shrink-0 ml-1" />
       <input type="number" inputMode="numeric" min={1} max={5000} className="input !py-2 flex-1 min-w-0" placeholder="Calories burned (optional)" aria-label="Calories burned on this walk" value={value} onChange={(e) => setValue(e.target.value)} />
+      <button className="btn-soft !py-2 shrink-0" type="submit" disabled={!editing && !value.trim()}>Save</button>
+    </form>
+  )
+}
+
+/** The day's step count, typed in from a watch or phone. Tracked only: no XP, no effect on the streak. */
+function StepsRow({ date, locked }: { date: string; locked?: boolean }) {
+  const saved = useStore((s) => s.days[date]?.steps)
+  const goal = useStore((s) => stepGoalOf(s.profile))
+  const setSteps = useStore((s) => s.setSteps)
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState('')
+  const isToday = date === todayKey()
+  const save = () => {
+    const n = parseFloat(value)
+    const reaches = n >= goal && !(saved && saved >= goal)
+    setSteps(date, value.trim() ? n : undefined)
+    setEditing(false); setValue('')
+    if (reaches) burst(); else if (n > 0) tap()
+  }
+  if (saved && !editing) {
+    const met = saved >= goal
+    return (
+      <div className="rounded-2xl bg-card-2 p-3 text-sm">
+        <div className="flex items-center gap-3">
+          <Footprints size={18} className="text-lavender-500 shrink-0" />
+          <div className="flex-1 min-w-0"><span className="font-semibold">{saved.toLocaleString()}</span> <span className="text-muted">of {goal.toLocaleString()} steps{met ? '. Goal reached' : ''}</span></div>
+          {!locked && <button className="btn-ghost !py-1 text-xs shrink-0" onClick={() => { setValue(String(saved)); setEditing(true) }}>Edit</button>}
+        </div>
+        <Progress value={Math.min(1, saved / goal)} className="mt-2" height="h-1.5" />
+      </div>
+    )
+  }
+  if (locked) return null
+  return (
+    <form className="flex items-center gap-2 rounded-2xl bg-card-2 p-2.5" onSubmit={(e) => { e.preventDefault(); save() }}>
+      <Footprints size={18} className="text-lavender-500 shrink-0 ml-1" />
+      <input type="number" inputMode="numeric" min={1} max={200000} className="input !py-2 flex-1 min-w-0" placeholder={isToday ? 'Steps today' : 'Steps that day'} aria-label={`Step count, from your watch or phone. Goal ${goal.toLocaleString()}`} value={value} onChange={(e) => setValue(e.target.value)} />
       <button className="btn-soft !py-2 shrink-0" type="submit" disabled={!editing && !value.trim()}>Save</button>
     </form>
   )
@@ -248,6 +286,7 @@ export function WorkoutCard({ date, locked }: { date: string; locked?: boolean }
         )}
 
         <OtherActivities date={date} locked={locked} />
+        <StepsRow date={date} locked={locked} />
 
         <p className="text-xs text-muted leading-relaxed">
           Listen to your body: pain, dizziness, or heavy fatigue means shorten it or rest. A modified walk is a win. Sleep comes first after a night shift.

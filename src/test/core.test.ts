@@ -791,3 +791,45 @@ describe('shift quests after the bottle quest was retired', () => {
     expect(seen).toBeGreaterThan(5)
   })
 })
+
+describe('steps', () => {
+  const day1 = '2026-01-01'
+  const fresh = (profile: object = {}) => useStore.setState({ ...initialState(), profile: { name: 'T', startDate: day1, units: 'lb', onboarded: true, ...profile } })
+  const stats = () => computeStats(useStore.getState(), '2026-01-20')
+
+  it('are tracked without XP or streak, against a goal of 8,000 unless changed', () => {
+    fresh()
+    const s = useStore.getState()
+    s.setShift(day1, 'day'); s.setSteps(day1, 12400.4)
+    s.setShift('2026-01-02', 'off'); s.setSteps('2026-01-02', 3000)
+    s.setSteps('2026-01-03', 8000)
+    s.setSteps('2026-01-03', 7999) // editing replaces
+    s.setSteps('2026-01-04', 0) // nothing to record
+    s.setSteps(addDays(todayKeyForTest(), 3), 9000) // not a future day
+    let st = stats()
+    expect(st.steps.days).toBe(3)
+    expect(st.steps.total).toBe(12400 + 3000 + 7999)
+    expect(st.steps.goal).toBe(8000)
+    expect(st.steps.goalDays).toBe(1)
+    expect(st.steps.best).toEqual({ date: day1, value: 12400 })
+    expect(st.steps.byShift.day).toEqual({ days: 1, total: 12400 })
+    expect(st.steps.byShift.off).toEqual({ days: 1, total: 3000 })
+    expect(st.lifetimeXp).toBe(0)
+    expect(st.streak).toBe(0)
+    useStore.getState().setProfile({ stepGoal: 3000 })
+    expect(stats().steps.goalDays).toBe(3)
+    s.setSteps(day1, undefined)
+    st = stats()
+    expect(st.steps.days).toBe(2)
+    expect(useStore.getState().days[day1].steps).toBeUndefined()
+  })
+  it('award the On Your Feet badge after ten days at goal', () => {
+    fresh()
+    const s = useStore.getState()
+    for (let i = 0; i < 9; i++) s.setSteps(addDays(day1, i), 8000)
+    s.setSteps(addDays(day1, 9), 7000)
+    expect(useStore.getState().badges['steps-10']).toBeUndefined()
+    s.setSteps(addDays(day1, 9), 9500)
+    expect(useStore.getState().badges['steps-10']).toBeTruthy()
+  })
+})

@@ -26,6 +26,10 @@ export const XP = {
   bonusMission: 10,
 } as const
 
+/** Daily step goal until the person sets their own. */
+export const DEFAULT_STEP_GOAL = 8000
+export const stepGoalOf = (profile: { stepGoal?: number }) => (profile.stepGoal && profile.stepGoal > 0 ? Math.round(profile.stepGoal) : DEFAULT_STEP_GOAL)
+
 /** How many minutes of other activity a day needs, in total, before it earns XP. */
 export const ACTIVITY_MIN_MINUTES = 30
 

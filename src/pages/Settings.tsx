@@ -9,6 +9,7 @@ import { Download, Upload, Moon, Sun, Monitor, Vibrate, EyeOff, Images } from 'l
 import { downloadAllPhotos } from '@/store/photos'
 import { waterSettings, fromMl, toMl, convertWaterSettings, type WaterUnit } from '@/lib/water'
 import { pushConfigured } from '@/store/push'
+import { stepGoalOf } from '@/lib/xp'
 import { hapticsSupported, tap } from '@/lib/haptics'
 import { AccountPanel } from '@/components/Account'
 import { useSync, syncConfigured, hasLocalBackup, localBackupJson } from '@/store/sync'
@@ -36,6 +37,7 @@ export default function SettingsPage() {
   const ws = waterSettings(profile)
   const [goalText, setGoalText] = useState(String(fromMl(ws.goalMl, ws.unit)))
   const [bottleText, setBottleText] = useState(String(fromMl(ws.bottleMl, ws.unit)))
+  const [stepText, setStepText] = useState(String(stepGoalOf(profile)))
   const switchWaterUnit = (u: WaterUnit) => {
     if (u === ws.unit) return
     const next = convertWaterSettings(profile, u)
@@ -111,6 +113,15 @@ export default function SettingsPage() {
             <button role="switch" aria-checked={ws.nudges} aria-label="Hydration nudges" onClick={() => setProfile({ waterNudges: !ws.nudges })} className={clsx('w-11 h-6 rounded-full relative transition shrink-0', ws.nudges ? 'bg-gradient-to-r from-lavender-500 to-blush-400' : 'bg-line')}><span className={clsx('absolute top-0.5 size-5 rounded-full bg-white shadow transition', ws.nudges ? 'left-5.5' : 'left-0.5')} /></button>
           </div>
           <p className="text-xs text-muted">A new goal applies from your next drink. Days already completed stay as they are.</p>
+        </Card>
+      </section>
+
+      <section>
+        <SectionTitle sub="Typed in from your watch or phone. Tracked for your stats, with no XP.">Steps</SectionTitle>
+        <Card>
+          <label className="label">Daily step goal</label>
+          <input type="number" inputMode="numeric" min={1} className="input" aria-label="Daily step goal" value={stepText} onChange={(e) => { setStepText(e.target.value); const v = parseFloat(e.target.value); if (v > 0) setProfile({ stepGoal: Math.round(v) }) }} />
+          <p className="text-xs text-muted mt-2">Changing it re-counts how many days reached the goal, including earlier days.</p>
         </Card>
       </section>
 

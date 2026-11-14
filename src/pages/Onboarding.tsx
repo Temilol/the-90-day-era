@@ -8,6 +8,7 @@ import { Modal } from '@/components/ui'
 import { AccountPanel } from '@/components/Account'
 import { useSync, syncConfigured } from '@/store/sync'
 import { WATER_DEFAULTS, toMl, type WaterUnit } from '@/lib/water'
+import { DEFAULT_STEP_GOAL } from '@/lib/xp'
 
 export default function Onboarding() {
   const setProfile = useStore((s) => s.setProfile)
@@ -16,6 +17,7 @@ export default function Onboarding() {
   const [units, setUnits] = useState<'lb' | 'kg'>('lb')
   const [step, setStep] = useState(0)
   const [waterUnit, setWaterUnit] = useState<WaterUnit>('oz')
+  const [stepGoal, setStepGoal] = useState(String(DEFAULT_STEP_GOAL))
   const [waterGoal, setWaterGoal] = useState(String(WATER_DEFAULTS.oz.goal))
   const pickWaterUnit = (u: WaterUnit) => { if (u !== waterUnit) { setWaterUnit(u); setWaterGoal(String(WATER_DEFAULTS[u].goal)) } }
   const [account, setAccount] = useState(false)
@@ -23,7 +25,7 @@ export default function Onboarding() {
 
   const finish = () => {
     const goal = parseFloat(waterGoal) > 0 ? parseFloat(waterGoal) : WATER_DEFAULTS[waterUnit].goal
-    setProfile({ name: name.trim(), startDate: start, units, onboarded: true, waterUnit, waterGoal: toMl(goal, waterUnit), waterBottle: toMl(WATER_DEFAULTS[waterUnit].bottle, waterUnit) })
+    setProfile({ name: name.trim(), startDate: start, units, onboarded: true, waterUnit, waterGoal: toMl(goal, waterUnit), waterBottle: toMl(WATER_DEFAULTS[waterUnit].bottle, waterUnit), stepGoal: parseFloat(stepGoal) > 0 ? Math.round(parseFloat(stepGoal)) : DEFAULT_STEP_GOAL })
     burst({ big: true })
   }
 
@@ -78,6 +80,11 @@ export default function Onboarding() {
                   </div>
                 </div>
                 <p className="text-xs text-muted mt-2">You log your water through the day, and the hydration quest ticks itself when you reach this. Pick what suits you. You can change the amount and the unit in Settings.</p>
+              </div>
+              <div>
+                <label className="label">Daily step goal</label>
+                <input type="number" inputMode="numeric" min={1} className="input text-base" aria-label="Daily step goal" value={stepGoal} onChange={(e) => setStepGoal(e.target.value)} />
+                <p className="text-xs text-muted mt-2">Optional. You type in your steps from your watch or phone. It’s tracked for your stats and earns no XP. Change the goal in Settings.</p>
               </div>
               <div className="rounded-2xl bg-card-2 p-4 text-sm">
                 <div className="font-semibold mb-1">Your standard workout</div>

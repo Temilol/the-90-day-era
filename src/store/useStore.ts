@@ -66,6 +66,8 @@ export interface Actions {
   /** Log a drink in millilitres. The hydration quest follows the day's total. */
   addWater: (date: string, ml: number) => void
   undoWater: (date: string) => void
+  /** Record the day's step count, or clear it. Tracked for stats and one badge; earns no XP. */
+  setSteps: (date: string, steps: number | undefined) => void
   setBonusMission: (date: string, text: string, source: string) => void
   completeBonusMission: (date: string) => void
   clearBonusMission: (date: string) => void
@@ -306,6 +308,13 @@ export const useStore = create<Store>()(
           })
         },
 
+        setSteps: (date, steps) => {
+          if (!inChallenge(get(), date)) return
+          mutate((s) => {
+            const d = day(s, date)
+            if (typeof steps === 'number' && isFinite(steps) && steps > 0) d.steps = Math.min(200000, Math.round(steps)); else delete d.steps
+          })
+        },
         addWater: (date, ml) => {
           if (!inChallenge(get(), date) || !(ml > 0)) return
           mutate((s) => {

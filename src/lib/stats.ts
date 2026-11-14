@@ -1,6 +1,6 @@
 import type { DayLog, EraState, ShiftType } from './types'
 import { TOTAL_DAYS, addDays, dayNumber, dateForDay, todayKey, weekOf, chapterOf, parseKey } from './dates'
-import { levelFor } from './xp'
+import { levelFor, stepGoalOf } from './xp'
 import { SELF_CARE_IDS } from '@/content/quests'
 import { BOSSES } from '@/content/bosses'
 import type { SecretKey } from '@/content/envelopes'
@@ -43,6 +43,8 @@ export interface Stats {
   calories: { total: number; byDate: Record<string, number>; daysWithData: number; walksWithData: number; walkTotal: number; best: { date: string; value: number } | null }
   otherActivities: number
   water: { days: number; totalMl: number } // days with any water logged, and how much
+  /** Step counts, from typed-in numbers only. */
+  steps: { days: number; total: number; goalDays: number; goal: number; byDate: Record<string, number>; best: { date: string; value: number } | null; byShift: Record<ShiftType, { days: number; total: number }> }
   bossesDefeated: number
   reflections: number
   purchases: number
@@ -151,6 +153,17 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
   }
   const water: Stats['water'] = { days: 0, totalMl: 0 }
   for (const d of logs) if (d.water && d.water > 0) { water.days++; water.totalMl += d.water }
+  const stepGoal = stepGoalOf(s.profile)
+  const steps: Stats['steps'] = { days: 0, total: 0, goalDays: 0, goal: stepGoal, byDate: {}, best: null, byShift: { day: { days: 0, total: 0 }, night: { days: 0, total: 0 }, elective: { days: 0, total: 0 }, off: { days: 0, total: 0 }, recovery: { days: 0, total: 0 } } }
+  for (const d of logs) {
+    if (!d.steps || d.steps <= 0) continue
+    steps.days++
+    steps.total += d.steps
+    steps.byDate[d.date] = d.steps
+    if (d.steps >= stepGoal) steps.goalDays++
+    if (!steps.best || d.steps > steps.best.value) steps.best = { date: d.date, value: d.steps }
+    if (d.shift && steps.byShift[d.shift]) { steps.byShift[d.shift].days++; steps.byShift[d.shift].total += d.steps }
+  }
   const bossesDefeated = s.xp.filter((e) => e.id.startsWith('boss:')).length
   const reflections = Object.keys(s.reflections).length
   const envelopesOpened = Object.values(s.envelopes).filter((e) => e.openedAt).length
@@ -210,7 +223,7 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
     daysLogged, daysRemaining: Math.max(0, TOTAL_DAYS - Math.min(currentDay, TOTAL_DAYS)),
     workouts, fullWorkouts, walkingMinutes, strengthSessions, strengthMinutes, recoveryDays,
     streak, bestStreak, lifetimeXp, spentXp, spendableXp, level: levelFor(lifetimeXp),
-    questsCompleted, questCounts, selfCareQuests, journalEntries, nightShiftWorkouts, dayShiftWorkouts, byShift, calories, otherActivities, water,
+    questsCompleted, questCounts, selfCareQuests, journalEntries, nightShiftWorkouts, dayShiftWorkouts, byShift, calories, otherActivities, water, steps,
     bossesDefeated, reflections, purchases: s.purchases.length, spins: s.spins.length, envelopesOpened,
     comebacks, themesUsed, bonusMissions, weekly, nsvs: s.nsvs.length, weights: s.weights.length, activeDates, frozenDates, freezesLeft, freezesLeftByChapter, bonusFreezes, secrets,
   }
