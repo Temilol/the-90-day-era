@@ -17,7 +17,7 @@ export const XP = {
   walkFull: 25, // 21-30 min
   walkLong: 30, // >30 min
   shiftBonus: 5, // on top of any walk logged on a day or night shift
-  activity: 10, // once a day, for another activity of ACTIVITY_MIN_MINUTES or more
+  activity: 10, // once a day, when the day's other activities add up to ACTIVITY_MIN_MINUTES or more
   strength: 15,
   boss: 25,
   reflection: 10,
@@ -26,7 +26,7 @@ export const XP = {
   bonusMission: 10,
 } as const
 
-/** How long another activity has to be before it earns XP. */
+/** How many minutes of other activity a day needs, in total, before it earns XP. */
 export const ACTIVITY_MIN_MINUTES = 30
 
 export function walkXp(minutes: number): number {

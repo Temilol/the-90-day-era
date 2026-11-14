@@ -78,19 +78,21 @@ function WalkCalories({ date, locked }: { date: string; locked?: boolean }) {
   )
 }
 
-const ACTIVITY_IDEAS = ['Bike', 'Run', 'Swim', 'Yoga', 'Class', 'Sport', 'Hike']
+const ACTIVITY_IDEAS = ['Stairs', 'Bike', 'Run', 'Swim', 'Yoga', 'Class', 'Sport', 'Hike']
+const ADD_MINUTES = 5
 
-/** Anything else you did. One of 30 minutes or more earns a little XP, once a day. The streak stays about the walk. */
+/** Anything else you did. Thirty minutes in total earns a little XP, once a day. The streak stays about the walk. */
 function OtherActivities({ date, locked }: { date: string; locked?: boolean }) {
   const list = useStore((s) => s.days[date]?.activities)
   const addActivity = useStore((s) => s.addActivity)
   const removeActivity = useStore((s) => s.removeActivity)
+  const addActivityMinutes = useStore((s) => s.addActivityMinutes)
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [mins, setMins] = useState('30')
   const earned = useStore((s) => s.xp.some((e) => e.id === `activity:${date}`))
-  const earnerId = (list ?? []).find((a) => a.minutes >= ACTIVITY_MIN_MINUTES)?.id // the first one long enough carries the tag
-  const wouldEarn = !earned && (parseFloat(mins) || 0) >= ACTIVITY_MIN_MINUTES
+  const total = (list ?? []).reduce((n, a) => n + (a.minutes || 0), 0)
+  const wouldEarn = !earned && total + (parseFloat(mins) || 0) >= ACTIVITY_MIN_MINUTES
   const [cal, setCal] = useState('')
   const save = () => {
     if (!name.trim()) return
@@ -103,14 +105,20 @@ function OtherActivities({ date, locked }: { date: string; locked?: boolean }) {
         <div key={a.id} className="flex items-center gap-3 rounded-2xl bg-card-2 p-3 text-sm min-w-0">
           <span className="text-lg shrink-0">🏃‍♀️</span>
           <div className="flex-1 min-w-0"><div className="font-semibold break-words">{a.name}</div><div className="text-xs text-muted">{a.minutes ? `${a.minutes} min` : 'Logged'}{a.calories ? ` · ${a.calories} cal` : ''}</div></div>
-          {earned && a.id === earnerId && <span className="chip bg-lavender-500 text-white shrink-0 whitespace-nowrap">+{XP.activity} XP</span>}
+          {!locked && <button className="btn-soft !py-1 !px-2.5 text-xs shrink-0 whitespace-nowrap" onClick={() => { addActivityMinutes(date, a.id, ADD_MINUTES); tap() }} aria-label={`Add ${ADD_MINUTES} minutes to ${a.name}`}>+{ADD_MINUTES} min</button>}
           {!locked && <button className="btn-ghost p-1.5" onClick={() => removeActivity(date, a.id)} aria-label={`Remove ${a.name}`}><X size={14} /></button>}
         </div>
       ))}
+      {(list ?? []).length > 0 && (
+        <div className="flex items-center justify-between gap-3 px-1 text-xs">
+          <span className="text-muted">{total} min of other activity today</span>
+          {earned ? <span className="chip bg-lavender-500 text-white shrink-0 whitespace-nowrap">+{XP.activity} XP earned</span> : <span className="text-muted shrink-0 whitespace-nowrap">{Math.max(0, ACTIVITY_MIN_MINUTES - total)} min to +{XP.activity} XP</span>}
+        </div>
+      )}
       {!locked && <button className="w-full rounded-2xl border border-dashed border-line p-3 text-sm text-muted hover:text-ink transition flex items-center justify-center gap-2" onClick={() => setOpen(true)}><Plus size={16} /> Log another activity</button>}
       <Modal open={open} onClose={() => setOpen(false)} title="Other activity">
         <div className="space-y-4">
-          <p className="text-sm text-muted">A class, a bike ride, a swim. It goes into your stats, and {ACTIVITY_MIN_MINUTES} minutes or more earns +{XP.activity} XP, once a day. Your streak still comes from the walk.</p>
+          <p className="text-sm text-muted">Stairs at work, a class, a bike ride. It goes into your stats. Once the day’s activities add up to {ACTIVITY_MIN_MINUTES} minutes you earn +{XP.activity} XP, once a day. Short bursts count: log the first, then tap +{ADD_MINUTES} min each time. Your streak still comes from the walk.</p>
           <div><label className="label">What was it?</label>
             <input className="input" placeholder="Spin class" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} />
             <div className="flex gap-2 mt-2 flex-wrap">{ACTIVITY_IDEAS.map((n) => <button key={n} type="button" onClick={() => setName(n)} className={clsx('chip', name === n ? 'bg-lavender-500 text-white' : 'bg-card-2 text-muted')}>{n}</button>)}</div>

@@ -54,6 +54,8 @@ export interface Actions {
   setWorkoutCalories: (date: string, calories: number | undefined) => void
   addActivity: (date: string, a: { name: string; minutes: number; calories?: number }) => void
   removeActivity: (date: string, id: string) => void
+  /** Add minutes to an activity already logged, for things done in several short bursts. */
+  addActivityMinutes: (date: string, id: string, minutes: number) => void
   logWorkout: (date: string, w: { minutes: number; incline: number; speed: number; theme?: string; notes?: string }) => void
   removeWorkout: (date: string) => void
   logStrength: (date: string, minutes: number, notes?: string, calories?: number) => void
@@ -140,14 +142,14 @@ function syncDouble(s: EraState, date: string) {
   award(s, id, amount, 'Double XP day', date)
 }
 /**
- * Other activities earn XP once per day, as long as at least one of them is long enough.
- * The award belongs to the day, so removing one activity keeps it while another still qualifies.
- * Returns true when it was newly added.
+ * Other activities earn XP once per day, when their minutes add up to enough. Several short
+ * bursts (stairs at work, say) count the same as one long session. The award belongs to the day,
+ * so it stays while the total still qualifies. Returns true when it was newly added.
  */
 function syncActivityXp(s: EraState, date: string): boolean {
   const id = `activity:${date}`
   const had = s.xp.some((e) => e.id === id)
-  const earned = (s.days[date]?.activities ?? []).some((a) => a.minutes >= ACTIVITY_MIN_MINUTES)
+  const earned = (s.days[date]?.activities ?? []).reduce((n, a) => n + (a.minutes || 0), 0) >= ACTIVITY_MIN_MINUTES
   if (!earned) { revoke(s, id); return false }
   if (!had) award(s, id, XP.activity, 'Other activity', date)
   return !had
@@ -228,6 +230,12 @@ export const useStore = create<Store>()(
             if (syncActivityXp(s, date)) toast(`+${XP.activity} XP`, 'Activity logged. That counts.')
           })
         },
+        addActivityMinutes: (date, id, minutes) => mutate((s) => {
+          const a = s.days[date]?.activities?.find((x) => x.id === id)
+          if (!a || !(minutes > 0)) return
+          a.minutes = Math.min(600, a.minutes + Math.round(minutes))
+          if (syncActivityXp(s, date)) toast(`+${XP.activity} XP`, `${ACTIVITY_MIN_MINUTES} minutes of extra movement today`)
+        }),
         removeActivity: (date, id) => mutate((s) => { const d = s.days[date]; if (d?.activities) { d.activities = d.activities.filter((x) => x.id !== id); syncActivityXp(s, date) } }),
 
         logWorkout: (date, w) => {

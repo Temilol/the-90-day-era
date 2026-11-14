@@ -62,7 +62,7 @@ export default function XpPage() {
         <SectionTitle>How XP works</SectionTitle>
         <Card className="text-sm">
           <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
-            {[['5–10 min modified walk', XP.walkShort], ['11–20 min modified walk', XP.walkMedium], ['21–30 min walk', XP.walkFull], ['Walk longer than 30 min', XP.walkLong], ['Bonus for any walk on a day or night shift', XP.shiftBonus], ['Another activity of 30+ minutes, once a day', XP.activity], ['10-minute strength session', XP.strength], ['Weekly boss battle', XP.boss], ['Weekly reflection', XP.reflection], ['Planned recovery day', XP.recovery], ['Daily quest', XP.quest], ['Bonus mission from the wheel', XP.bonusMission]].map(([k, v]) => (
+            {[['5–10 min modified walk', XP.walkShort], ['11–20 min modified walk', XP.walkMedium], ['21–30 min walk', XP.walkFull], ['Walk longer than 30 min', XP.walkLong], ['Bonus for any walk on a day or night shift', XP.shiftBonus], ['Other activities adding up to 30+ minutes, once a day', XP.activity], ['10-minute strength session', XP.strength], ['Weekly boss battle', XP.boss], ['Weekly reflection', XP.reflection], ['Planned recovery day', XP.recovery], ['Daily quest', XP.quest], ['Bonus mission from the wheel', XP.bonusMission]].map(([k, v]) => (
               <div key={k as string} className="flex justify-between border-b border-line py-1.5"><span className="text-muted">{k}</span><span className="font-semibold">+{v} XP</span></div>
             ))}
           </div>

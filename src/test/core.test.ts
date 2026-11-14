@@ -403,6 +403,33 @@ describe('shifts with impact', () => {
     const st = computeStats(useStore.getState(), '2026-01-02')
     expect(st.streak).toBe(0) // activities never count toward the streak
   })
+  it('short bursts add up: three stair sessions, or one entry topped up, earn the day’s 10 XP', () => {
+    fresh()
+    const s = useStore.getState()
+    const xp = () => computeStats(useStore.getState(), '2026-01-03').lifetimeXp
+    const acts = (d: string) => useStore.getState().days[d].activities!
+    s.addActivity(day1, { name: 'Stairs', minutes: 10 })
+    s.addActivity(day1, { name: 'Stairs', minutes: 10 })
+    expect(xp()).toBe(0)
+    s.addActivity(day1, { name: 'Stairs', minutes: 10 })
+    expect(xp()).toBe(10) // 30 in total
+    s.removeActivity(day1, acts(day1)[0].id)
+    expect(xp()).toBe(0) // back under the line
+    s.addActivity('2026-01-02', { name: 'Stairs', minutes: 5 })
+    const id = acts('2026-01-02')[0].id
+    for (let i = 0; i < 4; i++) s.addActivityMinutes('2026-01-02', id, 5)
+    expect(acts('2026-01-02')[0].minutes).toBe(25)
+    expect(xp()).toBe(0)
+    s.addActivityMinutes('2026-01-02', id, 5)
+    s.addActivityMinutes('2026-01-02', id, 5)
+    expect(acts('2026-01-02')).toHaveLength(1)
+    expect(acts('2026-01-02')[0].minutes).toBe(35)
+    expect(xp()).toBe(10) // once, not again at 35
+    s.addActivity('2026-01-03', { name: 'Yoga', minutes: 20 }); s.addActivity('2026-01-03', { name: 'Stairs', minutes: 10 })
+    expect(xp()).toBe(20) // different activities combine too
+    s.toggleQuest('2026-01-03', 'stairs')
+    expect(xp()).toBe(25) // the stairs quest is separate and untouched
+  })
   it('counts walks by kind of day', () => {
     fresh()
     const s = useStore.getState()
