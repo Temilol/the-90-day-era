@@ -31,8 +31,9 @@ export function useStats() {
   const nsvs = useStore((s) => s.nsvs)
   const weights = useStore((s) => s.weights)
   const freezes = useStore((s) => s.freezes)
+  const prizes = useStore((s) => s.prizes)
   // eslint-disable-next-line react-hooks/exhaustive-deps -- deps are the store slices computeStats reads
-  return useMemo(() => computeStats(useStore.getState(), today), [today, days, xp, purchases, profile, reflections, envelopes, spins, nsvs, weights, freezes])
+  return useMemo(() => computeStats(useStore.getState(), today), [today, days, xp, purchases, profile, reflections, envelopes, spins, nsvs, weights, freezes, prizes])
 }
 
 /**
@@ -41,7 +42,7 @@ export function useStats() {
  * are random, and quests that can't be done on that shift are left out. Quests already ticked off
  * stay on the list even if the shift changes afterwards.
  */
-export function questsFor(date: string, shift?: ShiftType, done?: Record<string, string>): Quest[] {
+export function questsFor(date: string, shift?: ShiftType, done?: Record<string, string>, swaps?: string[]): Quest[] {
   let picks: Quest[]
   if (!shift) {
     picks = pickN(QUEST_POOL, 3, seeded(`quests:${date}`))
@@ -50,6 +51,14 @@ export function questsFor(date: string, shift?: ShiftType, done?: Record<string,
     const fit = pickN(QUEST_POOL.filter((q) => q.fits?.includes(shift)), 1, rnd)
     const rest = pickN(QUEST_POOL.filter((q) => !fit.includes(q) && !q.avoid?.includes(shift)), 3 - fit.length, rnd)
     picks = [...fit, ...rest]
+  }
+  // A quest traded away with a quest-swap prize is replaced by another that suits the day.
+  for (const gone of swaps ?? []) {
+    const i = picks.findIndex((q) => q.id === gone)
+    if (i < 0) continue
+    const options = QUEST_POOL.filter((q) => !picks.includes(q) && !(swaps ?? []).includes(q.id) && !(shift && q.avoid?.includes(shift)))
+    const next = pickN(options, 1, seeded(`swap:${date}:${gone}`))[0]
+    if (next) picks[i] = next
   }
   if (done) {
     for (const q of QUEST_POOL) {

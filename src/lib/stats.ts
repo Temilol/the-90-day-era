@@ -55,6 +55,7 @@ export interface Stats {
   frozenDates: Set<string>
   freezesLeft: number // in the current chapter
   freezesLeftByChapter: number[]
+  bonusFreezes: number // unused extra freezes won from envelopes
 }
 
 export function isActiveDay(d?: DayLog): boolean {
@@ -177,7 +178,11 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
   }
 
   const daysLogged = activeDates.size
-  const freezesLeftByChapter = [1, 2, 3].map((ch) => Math.max(0, FREEZES_PER_CHAPTER - [...frozenDates].filter((d) => chapterOf(dayNumber(startDate!, d)) === ch).length))
+  // Freezes paid for by an envelope prize don't use up the chapter's own allowance.
+  const freezePrizes = (s.prizes ?? []).filter((p) => p.key === 'freeze')
+  const paidDates = new Set(freezePrizes.filter((p) => p.usedOn && s.freezes[p.usedOn]).map((p) => p.usedOn!))
+  const bonusFreezes = freezePrizes.length - paidDates.size
+  const freezesLeftByChapter = [1, 2, 3].map((ch) => Math.max(0, FREEZES_PER_CHAPTER - [...frozenDates].filter((d) => !paidDates.has(d) && chapterOf(dayNumber(startDate!, d)) === ch).length))
   const freezesLeft = startDate ? freezesLeftByChapter[chapterOf(displayDay) - 1] : 0
   return {
     today, startDate, started, finished, currentDay, displayDay, daysUntilStart,
@@ -187,7 +192,7 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
     streak, bestStreak, lifetimeXp, spentXp, spendableXp, level: levelFor(lifetimeXp),
     questsCompleted, questCounts, selfCareQuests, journalEntries, nightShiftWorkouts, dayShiftWorkouts, byShift, calories, otherActivities,
     bossesDefeated, reflections, purchases: s.purchases.length, spins: s.spins.length, envelopesOpened,
-    comebacks, themesUsed, bonusMissions, weekly, nsvs: s.nsvs.length, weights: s.weights.length, activeDates, frozenDates, freezesLeft, freezesLeftByChapter,
+    comebacks, themesUsed, bonusMissions, weekly, nsvs: s.nsvs.length, weights: s.weights.length, activeDates, frozenDates, freezesLeft, freezesLeftByChapter, bonusFreezes,
   }
 }
 

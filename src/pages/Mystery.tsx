@@ -3,23 +3,19 @@ import { clsx } from 'clsx'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStore } from '@/store/useStore'
 import { useStats } from '@/lib/hooks'
-import { ENVELOPE_DEFS, ENVELOPE_REWARDS } from '@/content/envelopes'
+import { EnvelopeGrid, MyRewards, TimeCapsule } from '@/components/Envelopes'
 import { WHEEL } from '@/content/wheel'
 import { THEMES } from '@/content/themes'
-import { PageHeader, SectionTitle, Card, Modal } from '@/components/ui'
-import { burst, hearts } from '@/components/Celebrate'
+import { PageHeader, SectionTitle, Card } from '@/components/ui'
+import { hearts } from '@/components/Celebrate'
 import { XP } from '@/lib/xp'
 import { addDays, dayNumber, TOTAL_DAYS } from '@/lib/dates'
 
 export default function Mystery() {
   const stats = useStats()
-  const envelopes = useStore((s) => s.envelopes)
-  const openEnvelope = useStore((s) => s.openEnvelope)
   const recordSpin = useStore((s) => s.recordSpin)
   const setBonus = useStore((s) => s.setBonusMission)
   const todayLog = useStore((s) => s.days[stats.today])
-  const [opening, setOpening] = useState<string | null>(null)
-  const [revealed, setRevealed] = useState<string | null>(null)
   const [cat, setCat] = useState(WHEEL[0].id)
   const [spinning, setSpinning] = useState(false)
   const [angle, setAngle] = useState(0)
@@ -41,10 +37,6 @@ export default function Mystery() {
       hearts()
     }, 3600)
   }
-  const doOpen = (id: string) => {
-    setOpening(id)
-    setTimeout(() => { openEnvelope(id); setOpening(null); setRevealed(id); burst({ big: true }) }, 1100)
-  }
   const active = stats.started && !stats.finished
   const todayBonus = todayLog?.bonusMission
   const todayDone = !!todayBonus?.done
@@ -62,30 +54,11 @@ export default function Mystery() {
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Mystery Missions" emoji="🎁" sub="Envelopes unlock at milestones. The wheel is always open." />
+      <PageHeader title="Mystery Missions" emoji="🎁" sub="Envelopes unlock at milestones. Pick one of three rewards and keep it. The wheel is always open." />
 
-      <section>
-        <SectionTitle sub={`${Object.values(envelopes).filter((e) => !e.openedAt).length} ready to open`}>Mystery envelopes</SectionTitle>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {ENVELOPE_DEFS.map((def) => {
-            const e = envelopes[def.id]
-            const state = !e ? 'locked' : e.openedAt ? 'opened' : 'ready'
-            const t = def.trigger
-            const hint = t.type === 'day' ? `Reach Day ${t.value} with ${Math.ceil(t.value / 3)}+ active days` : t.type === 'workouts' ? `${t.value} workouts` : `${t.value}-day streak`
-            return (
-              <motion.button key={def.id} whileTap={state === 'ready' ? { scale: 0.95 } : {}} disabled={state !== 'ready'} onClick={() => doOpen(def.id)}
-                className={clsx('card p-4 text-left relative overflow-hidden', state === 'ready' && 'ring-2 ring-blush-400 shadow-glow', state === 'locked' && 'opacity-70')}>
-                <motion.div animate={opening === def.id ? { rotateX: [0, -180], y: [0, -6, 0] } : state === 'ready' ? { y: [0, -4, 0] } : {}} transition={opening === def.id ? { duration: 1 } : { repeat: Infinity, duration: 1.8 }} className="text-4xl">
-                  {state === 'opened' ? '💌' : state === 'ready' ? '✉️' : '🔒'}
-                </motion.div>
-                <div className="font-semibold text-sm mt-2 leading-tight">{def.title}</div>
-                <div className="text-xs text-muted mt-0.5">{state === 'locked' ? hint : state === 'ready' ? 'Tap to open' : 'Opened'}</div>
-                {state === 'opened' && <div className="text-xs mt-2 text-lavender-600 dark:text-lavender-300 line-clamp-2">{e!.reward}</div>}
-              </motion.button>
-            )
-          })}
-        </div>
-      </section>
+      <EnvelopeGrid />
+      <MyRewards />
+      <TimeCapsule />
 
       <section>
         <SectionTitle sub="Pick a category and spin. One result a day can become your bonus mission for +10 XP.">Spin the wheel</SectionTitle>
@@ -132,17 +105,6 @@ export default function Mystery() {
         </div>
       </section>
 
-      <Modal open={!!revealed} onClose={() => setRevealed(null)}>
-        {revealed && (() => { const e = envelopes[revealed]; const r = ENVELOPE_REWARDS.find((x) => x.text === e?.reward); return (
-          <div className="text-center py-4">
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 12 }} className="text-6xl">{r?.emoji ?? '💌'}</motion.div>
-            <div className="text-xs font-bold uppercase tracking-[0.25em] text-lavender-500 mt-4">{ENVELOPE_DEFS.find((d) => d.id === revealed)?.title}</div>
-            <div className="h-display text-2xl mt-2">{e?.reward}</div>
-            {r?.xp && <div className="gradient-text font-bold mt-2">+{r.xp} XP added</div>}
-            <button className="btn-primary w-full mt-6" onClick={() => setRevealed(null)}>Yay</button>
-          </div>
-        ) })()}
-      </Modal>
     </div>
   )
 }

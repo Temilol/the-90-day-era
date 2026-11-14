@@ -10,7 +10,8 @@ import { THEMES } from '@/content/themes'
 import { Check, Modal } from './ui'
 import { burst, hearts } from './Celebrate'
 import { tap } from '@/lib/haptics'
-import { Shuffle, Trash2, Flame, Plus, X } from 'lucide-react'
+import { Shuffle, Trash2, Flame, Plus, X, Repeat } from 'lucide-react'
+import { readyPrizes } from '@/lib/prizes'
 import { todayKey, addDays, dayNumber } from '@/lib/dates'
 
 export const SHIFTS: { id: ShiftType; label: string; short: string; emoji: string; sub: string }[] = [
@@ -141,6 +142,8 @@ export function WorkoutCard({ date, locked }: { date: string; locked?: boolean }
   const walkEarned = useStore((s) => s.xp.find((e) => e.id === `workout:${date}`)?.amount ?? 0)
   const bonusEarned = useStore((s) => s.xp.find((e) => e.id === `shiftbonus:${date}`)?.amount ?? 0)
   const bonusDay = earnsShiftBonus(d?.shift)
+  const doubleEarned = useStore((s) => s.xp.find((e) => e.id === `double:${date}`)?.amount ?? 0)
+  const doubleOn = useStore((s) => !!s.days[date]?.doubleXp && s.prizes.some((p) => p.id === s.days[date]!.doubleXp))
   const theme = themeFor(date, d?.themeOverride)
   const startDate = useStore((s) => s.profile.startDate)
   const yesterdayKey = addDays(date, -1)
@@ -170,9 +173,9 @@ export function WorkoutCard({ date, locked }: { date: string; locked?: boolean }
             <div className={clsx('text-xs font-bold uppercase tracking-[0.2em]', done ? 'text-white/80' : 'text-lavender-500')}>{done ? 'Workout complete' : date === todayKey() ? 'Today’s workout' : 'The walk'}</div>
             <div className="h-display text-2xl mt-1">{done ? `${d!.workout!.minutes} min logged` : 'The Standard'}</div>
             <div className={clsx('text-sm mt-1', done ? 'text-white/85' : 'text-muted')}>
-              {done ? `Incline ${d!.workout!.incline} · ${d!.workout!.speed} mph · +${walkEarned} XP${bonusEarned ? ` walk, +${bonusEarned} shift bonus` : ''}` : 'Incline 12 · 3.0 mph · 30 minutes'}
+              {done ? `Incline ${d!.workout!.incline} · ${d!.workout!.speed} mph · +${walkEarned} XP${bonusEarned ? ` walk, +${bonusEarned} shift bonus` : ''}${doubleEarned ? `, +${doubleEarned} double XP` : ''}` : 'Incline 12 · 3.0 mph · 30 minutes'}
             </div>
-            {!done && bonusDay && <div className="mt-2 inline-flex chip bg-lavender-500 text-white">🛡️ Shift day: +{XP.shiftBonus} bonus XP</div>}
+            {!done && (bonusDay || doubleOn) && <div className="mt-2 flex flex-wrap gap-1.5">{bonusDay && <span className="chip bg-lavender-500 text-white">🛡️ Shift day: +{XP.shiftBonus} bonus XP</span>}{doubleOn && <span className="chip bg-blush-500 text-white">⚡ Double XP is on</span>}</div>}
           </div>
           <motion.div animate={done ? { rotate: [0, -10, 10, 0] } : {}} className="text-4xl">{done ? '🏆' : '🚶‍♀️'}</motion.div>
         </div>
@@ -276,13 +279,20 @@ export function QuestList({ date, locked }: { date: string; locked?: boolean }) 
   const toggleQuest = useStore((s) => s.toggleQuest)
   const completeBonus = useStore((s) => s.completeBonusMission)
   const clearBonus = useStore((s) => s.clearBonusMission)
-  const quests = questsFor(date, d?.shift, d?.quests)
+  const quests = questsFor(date, d?.shift, d?.quests, d?.swaps)
+  const swapQuest = useStore((s) => s.swapQuest)
+  const swapsLeft = useStore((s) => readyPrizes(s, 'swap', todayKey()).length)
+  const canSwap = !locked && swapsLeft > 0 && date === todayKey()
   const doneCount = quests.filter((q) => d?.quests?.[q.id]).length
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between text-xs text-muted px-1"><span>{doneCount}/{quests.length} complete · {XP.quest} XP each</span>{doneCount === quests.length && <span className="gradient-text font-bold">All done ✦</span>}</div>
+      {canSwap && <div className="text-xs text-lavender-600 dark:text-lavender-300 px-1">🔁 You have {swapsLeft} quest {swapsLeft === 1 ? 'swap' : 'swaps'}. Tap the swap icon on a quest you’d rather trade.</div>}
       {quests.map((q) => (
-        <Check key={q.id} disabled={locked} checked={!!d?.quests?.[q.id]} onChange={() => { toggleQuest(date, q.id); tap(); if (!d?.quests?.[q.id] && doneCount + 1 === quests.length) burst() }} label={q.title} sub={q.hint} emoji={q.emoji} />
+        <div key={q.id} className="relative">
+          <Check disabled={locked} checked={!!d?.quests?.[q.id]} onChange={() => { toggleQuest(date, q.id); tap(); if (!d?.quests?.[q.id] && doneCount + 1 === quests.length) burst() }} label={q.title} sub={q.hint} emoji={q.emoji} />
+          {canSwap && q.id !== 'hydrate' && !d?.quests?.[q.id] && <button onClick={() => { if (swapQuest(date, q.id)) hearts() }} className="absolute right-2 top-2 btn-ghost p-1.5" aria-label={`Swap “${q.title}” for a different quest`}><Repeat size={14} /></button>}
+        </div>
       ))}
       {d?.bonusMission && (
         <div className="relative">

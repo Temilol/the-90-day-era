@@ -43,6 +43,8 @@ export interface DayLog {
   hours?: ShiftHours // elective days only
   shiftSet?: 'me' | 'plan' // 'plan' = filled in by the schedule form; anything else was set by hand
   activities?: Activity[]
+  doubleXp?: string // id of the double-XP prize switched on for this day
+  swaps?: string[] // quests traded away on this day
   workout?: Workout
   strength?: StrengthSession
   recovery?: boolean // planned recovery day
@@ -85,8 +87,15 @@ export interface Envelope {
   id: string
   unlockedAt: string
   openedAt?: string
-  reward?: string
+  reward?: string // what was won, in words
+  options?: string[] // the three prizes inside, fixed the first time the envelope is opened
+  rewardKey?: string // the prize that was picked
 }
+
+/** A prize won from an envelope and kept until it is used. */
+export interface Prize { id: string; key: string; from: string; wonAt: string; usedAt?: string; usedOn?: string; note?: string }
+/** A letter written early in the challenge, sealed until Day 90. */
+export interface Capsule { text: string; sealedAt: string; day: number }
 
 export interface WeightEntry { date: string; value: number }
 /** A progress photo. The picture itself is stored separately; this is just its label. */
@@ -112,5 +121,7 @@ export interface EraState {
   reminders: Reminder[]
   spins: Spin[]
   celebrations: Record<string, string>
+  prizes: Prize[]
+  capsule: Capsule | null
   freezes: Record<string, string> // date -> usedAt; patches a missed day for streak purposes
 }

@@ -102,9 +102,9 @@ export default function Calendar() {
                       <div><div className="font-semibold">🧊 Streak freeze applied</div><div className="text-xs text-muted">This day doesn’t break your streak. Logging a walk or rest here gives the freeze back.</div></div>
                       <button className="btn-ghost !py-1.5 text-xs" onClick={() => removeFreeze(selDate)}>Undo</button>
                     </div>
-                  ) : (() => { const left = stats.freezesLeftByChapter[CHAPTERS.find((c) => sel >= c.from && sel <= c.to)!.n - 1]; return (
+                  ) : (() => { const chapterLeft = stats.freezesLeftByChapter[CHAPTERS.find((c) => sel >= c.from && sel <= c.to)!.n - 1]; const left = chapterLeft + stats.bonusFreezes; return (
                     <div className="rounded-2xl bg-card-2 p-3 text-sm flex items-center justify-between gap-3">
-                      <div><div className="font-semibold">🧊 Life happened?</div><div className="text-xs text-muted">{left > 0 ? `Use a streak freeze so this day doesn’t count against you. ${left} left this chapter.` : 'No freezes left this chapter. Logging a rest or walk here still repairs your streak.'}</div></div>
+                      <div><div className="font-semibold">🧊 Life happened?</div><div className="text-xs text-muted">{chapterLeft > 0 ? `Use a streak freeze so this day doesn’t count against you. ${chapterLeft} left this chapter${stats.bonusFreezes ? `, plus ${stats.bonusFreezes} from envelopes` : ''}.` : stats.bonusFreezes > 0 ? `This chapter’s freeze is used, but you have ${stats.bonusFreezes} from envelopes.` : 'No freezes left this chapter. Logging a rest or walk here still repairs your streak.'}</div></div>
                       <button className="btn-soft !py-1.5 text-xs shrink-0" disabled={left <= 0} onClick={() => applyFreeze(selDate)}>Freeze</button>
                     </div>
                   ) })()

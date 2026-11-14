@@ -425,3 +425,130 @@ describe('push reminder queue', () => {
     expect(buildReminderQueue({ ...state, profile: { ...state.profile, startDate: null } }, now)).toEqual([])
   })
 })
+
+describe('envelopes: tiers, pick one of three, prizes you keep', () => {
+  const day1 = '2026-01-01'
+  const setup = (extra: Partial<ReturnType<typeof initialState>> = {}) => useStore.setState({ ...initialState(), profile: { name: 'T', startDate: day1, units: 'lb', onboarded: true }, ...extra })
+  const unlocked = (id: string, options?: string[]) => ({ [id]: { id, unlockedAt: 'x', ...(options ? { options } : {}) } })
+  const xpOf = (id: string) => useStore.getState().xp.find((e) => e.id === id)?.amount ?? 0
+
+  it('draws three different prizes from the right tier, once', async () => {
+    const { PRIZES, ENVELOPE_DEFS } = await import('@/content/envelopes')
+    const { drawOptions } = await import('@/lib/prizes')
+    for (const tier of ['common', 'rare', 'legendary'] as const) {
+      expect(PRIZES.filter((p) => p.tiers.includes(tier)).length).toBeGreaterThanOrEqual(5)
+      for (let i = 0; i < 30; i++) {
+        const o = drawOptions(tier, [])
+        expect(new Set(o).size).toBe(3)
+        expect(o.every((k) => PRIZES.find((p) => p.key === k)!.tiers.includes(tier))).toBe(true)
+      }
+    }
+    expect(ENVELOPE_DEFS.find((d) => d.id === 'day90')!.tier).toBe('legendary')
+    // treats already won are avoided while enough others remain
+    const won = ['drink', 'lazy'].map((key, i) => ({ id: `p${i}`, key, from: 'x', wonAt: 'x' }))
+    for (let i = 0; i < 30; i++) expect(drawOptions('common', won).some((k) => k === 'drink' || k === 'lazy')).toBe(false)
+    setup({ envelopes: unlocked('day30') })
+    useStore.getState().drawEnvelope('day30')
+    const first = useStore.getState().envelopes.day30.options
+    useStore.getState().drawEnvelope('day30')
+    expect(useStore.getState().envelopes.day30.options).toEqual(first) // reopening can't re-roll
+  })
+  it('picking keeps one prize, adds XP prizes straight away, and can only happen once', () => {
+    setup({ envelopes: { ...unlocked('day7', ['xp25', 'drink', 'swap']), ...unlocked('day30', ['freeze', 'double', 'off20']) } })
+    const s = useStore.getState()
+    s.chooseEnvelope('day7', 'movie') // not one of the three
+    expect(useStore.getState().prizes).toHaveLength(0)
+    s.chooseEnvelope('day7', 'xp25')
+    s.chooseEnvelope('day7', 'drink')
+    expect(useStore.getState().prizes.map((p) => p.key)).toEqual(['xp25'])
+    expect(xpOf('envelope:day7')).toBe(25)
+    expect(useStore.getState().envelopes.day7.reward).toBe('25 bonus XP')
+    s.chooseEnvelope('day30', 'freeze')
+    expect(useStore.getState().prizes.map((p) => p.key)).toEqual(['xp25', 'freeze'])
+  })
+  it('an envelope freeze covers a day after the chapter freeze is gone, and comes back if undone', () => {
+    setup({ prizes: [{ id: 'f1', key: 'freeze', from: 'day30', wonAt: 'x' }] })
+    const s = useStore.getState()
+    const today = todayKeyForTest()
+    useStore.setState((st) => ({ profile: { ...st.profile, startDate: addDays(today, -10) } }))
+    const a = addDays(today, -5), b = addDays(today, -4), c = addDays(today, -3)
+    expect(computeStats(useStore.getState()).bonusFreezes).toBe(1)
+    expect(s.applyFreeze(a)).toBe(true) // the chapter's own
+    expect(computeStats(useStore.getState()).bonusFreezes).toBe(1)
+    expect(s.applyFreeze(b)).toBe(true) // the envelope's
+    expect(computeStats(useStore.getState()).bonusFreezes).toBe(0)
+    expect(s.applyFreeze(c)).toBe(false)
+    s.removeFreeze(b)
+    expect(computeStats(useStore.getState()).bonusFreezes).toBe(1)
+    expect(s.applyFreeze(c)).toBe(true)
+  })
+  it('double XP doubles the day’s walk and follows changes to it', async () => {
+    const { prizeUsed } = await import('@/lib/prizes')
+    const today = todayKeyForTest()
+    setup({ prizes: [{ id: 'd1', key: 'double', from: 'day30', wonAt: 'x' }, { id: 'd2', key: 'double', from: 'w25', wonAt: 'x' }] })
+    useStore.setState((st) => ({ profile: { ...st.profile, startDate: addDays(today, -3) } }))
+    const s = useStore.getState()
+    s.setShift(today, 'night')
+    s.redeemPrize('d1')
+    s.redeemPrize('d2') // one per day
+    expect(useStore.getState().days[today].doubleXp).toBe('d1')
+    expect(xpOf(`double:${today}`)).toBe(0) // nothing to double yet
+    s.logWorkout(today, { minutes: 30, incline: 12, speed: 3 })
+    expect(xpOf(`double:${today}`)).toBe(30) // walk 25 + shift bonus 5
+    expect(computeStats(useStore.getState()).lifetimeXp).toBe(60)
+    s.logWorkout(today, { minutes: 10, incline: 12, speed: 3 })
+    expect(computeStats(useStore.getState()).lifetimeXp).toBe(30)
+    s.setShift(today, 'off')
+    expect(computeStats(useStore.getState()).lifetimeXp).toBe(20)
+    const st = useStore.getState()
+    expect(prizeUsed(st.prizes[0], st, today)).toBe(true)
+    expect(prizeUsed(st.prizes[1], st, today)).toBe(false)
+    s.removeWorkout(today)
+    expect(computeStats(useStore.getState()).lifetimeXp).toBe(0)
+    // a double-XP day that never got a walk hands the prize back the next day
+    expect(prizeUsed(useStore.getState().prizes[0], useStore.getState(), addDays(today, 1))).toBe(false)
+  })
+  it('a discount prize lowers one shop price and is then spent', () => {
+    setup({ prizes: [{ id: 'c1', key: 'off20', from: 'day30', wonAt: 'x' }], xp: [{ id: 'seed', amount: 180, reason: 'seed', date: day1, at: 'x' }] })
+    const s = useStore.getState()
+    expect(s.buyReward('accessory')).toBe(false) // 200 XP, only 180
+    expect(s.buyReward('accessory', 'c1')).toBe(true) // 160 with 20% off
+    expect(useStore.getState().purchases[0].cost).toBe(160)
+    expect(useStore.getState().prizes[0].usedAt).toBeTruthy()
+    expect(useStore.getState().prizes[0].note).toBe('New workout accessory')
+    useStore.setState((st) => ({ xp: [...st.xp, { id: 'more', amount: 90, reason: 'seed', date: day1, at: 'x' }] }))
+    expect(s.buyReward('coffee', 'c1')).toBe(true) // coupon already spent: full price
+    expect(useStore.getState().purchases[1].cost).toBe(100)
+  })
+  it('a quest swap trades one of today’s quests and uses the prize', async () => {
+    const { questsFor } = await import('@/lib/hooks')
+    const today = todayKeyForTest()
+    setup({ prizes: [{ id: 's1', key: 'swap', from: 'day7', wonAt: 'x' }] })
+    useStore.setState((st) => ({ profile: { ...st.profile, startDate: addDays(today, -3) } }))
+    const s = useStore.getState()
+    s.setShift(today, 'day')
+    const before = questsFor(today, 'day')
+    expect(s.swapQuest(today, 'hydrate')).toBe(false)
+    expect(s.swapQuest(today, before[2].id)).toBe(true)
+    const d = useStore.getState().days[today]
+    const after = questsFor(today, 'day', d.quests, d.swaps)
+    expect(after).toHaveLength(4)
+    expect(after.map((q) => q.id)).not.toContain(before[2].id)
+    expect([after[0].id, after[1].id, after[3].id]).toEqual([before[0].id, before[1].id, before[3].id])
+    expect(after.some((q) => q.avoid?.includes('day'))).toBe(false)
+    expect(new Set(after.map((q) => q.id)).size).toBe(4)
+    expect(s.swapQuest(today, after[1].id)).toBe(false) // prize already used
+  })
+  it('seals the time capsule once and says what the next envelope needs', async () => {
+    const { nextEnvelope } = await import('@/lib/prizes')
+    setup()
+    const s = useStore.getState()
+    s.sealCapsule('  Dear me, keep going.  ')
+    s.sealCapsule('A second letter')
+    expect(useStore.getState().capsule?.text).toBe('Dear me, keep going.')
+    for (let i = 0; i < 4; i++) s.logWorkout(addDays(day1, i), { minutes: 30, incline: 12, speed: 3 })
+    const st = useStore.getState()
+    expect(nextEnvelope(computeStats(st, addDays(day1, 3)), {})).toEqual({ title: 'One Week In', need: '3 more days' })
+    expect(nextEnvelope(computeStats(st, addDays(day1, 3)), { day7: { id: 'day7', unlockedAt: 'x' } })).toEqual({ title: 'Seven-Day Streak', need: '3 more days in a row' })
+  })
+})

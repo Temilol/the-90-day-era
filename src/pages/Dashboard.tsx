@@ -14,6 +14,8 @@ import { Card, Progress, Ring, Sparkles, Modal } from '@/components/ui'
 import { burst } from '@/components/Celebrate'
 import { RecapPhotos } from '@/components/Photos'
 import { WalkPlanCard, planSummary } from '@/components/WalkPlan'
+import { nextEnvelope } from '@/lib/prizes'
+import { CAPSULE_FROM_DAY, CAPSULE_UNTIL_DAY } from '@/components/Envelopes'
 import { SHIFTS } from '@/components/DayPanel'
 import { ArrowRight, Flame, Sparkles as SparkIcon, Swords, Gift, CalendarDays, BookHeart, ShoppingBag, Trophy } from 'lucide-react'
 
@@ -28,10 +30,13 @@ export default function Dashboard() {
   const celebration = useUi((s) => s.celebration)
   const setCelebration = useUi((s) => s.setCelebration)
   const quote = quoteFor(today)
-  const quests = questsFor(today, d?.shift, d?.quests)
+  const quests = questsFor(today, d?.shift, d?.quests, d?.swaps)
   const questsDone = quests.filter((q) => d?.quests?.[q.id]).length
   const unopened = Object.values(envelopes).filter((e) => !e.openedAt).length
   const tomorrowKey = addDays(today, 1)
+  const upcoming = nextEnvelope(stats, envelopes)
+  const capsule = useStore((s) => s.capsule)
+  const askCapsule = !capsule && stats.started && !stats.finished && stats.currentDay >= CAPSULE_FROM_DAY && stats.currentDay <= CAPSULE_UNTIL_DAY
   const tomorrow = useStore((s) => s.days[tomorrowKey])
 
   // Chapter celebrations, shown once each
@@ -125,6 +130,25 @@ export default function Dashboard() {
       </div>
 
       {stats.started && !stats.finished && <WalkPlanCard date={today} setShiftHref="/today" />}
+
+      {stats.started && (unopened > 0 || upcoming) && (
+        <Link to="/mystery" className="card !p-4 flex items-center gap-3 hover:shadow-glow transition min-w-0">
+          <span className="text-2xl leading-none shrink-0">{unopened > 0 ? '💌' : '✉️'}</span>
+          <div className="flex-1 min-w-0">
+            {unopened > 0
+              ? <><div className="text-sm font-semibold">{unopened} {unopened === 1 ? 'envelope is' : 'envelopes are'} ready to open</div><div className="text-xs text-muted">Pick one of three rewards.</div></>
+              : <><div className="text-sm font-semibold break-words">{upcoming!.need} to your next envelope</div><div className="text-xs text-muted break-words">{upcoming!.title}</div></>}
+          </div>
+          <ArrowRight size={16} className="text-lavender-400 shrink-0" />
+        </Link>
+      )}
+      {askCapsule && (
+        <Link to="/mystery#capsule" className="card !p-4 flex items-center gap-3 hover:shadow-glow transition min-w-0">
+          <span className="text-2xl leading-none shrink-0">💌</span>
+          <div className="flex-1 min-w-0"><div className="text-sm font-semibold">Write to your Day 90 self</div><div className="text-xs text-muted">A short letter, sealed today and handed back at the finish.</div></div>
+          <ArrowRight size={16} className="text-lavender-400 shrink-0" />
+        </Link>
+      )}
 
       {tomorrow?.shift && !stats.finished && (
         <Card className="!p-4 flex items-start gap-3">

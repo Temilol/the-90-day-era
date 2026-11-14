@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { clsx } from 'clsx'
+import { readyPrizes } from '@/lib/prizes'
+import { prizeDef } from '@/content/envelopes'
+import { todayKey } from '@/lib/dates'
 import { useStore } from '@/store/useStore'
 import { useStats } from '@/lib/hooks'
 import { PageHeader, Card, Modal, Progress, SectionTitle, Empty } from '@/components/ui'
@@ -20,6 +23,14 @@ export default function Shop() {
   const removeReward = useStore((s) => s.removeReward)
   const [edit, setEdit] = useState<Partial<Reward> | null>(null)
   const [confirmBuy, setConfirmBuy] = useState<Reward | null>(null)
+  const prizes = useStore((s) => s.prizes)
+  const allDays = useStore((s) => s.days)
+  const freezes = useStore((s) => s.freezes)
+  const coupons = readyPrizes({ prizes, days: allDays, freezes }, 'discount', todayKey()).map((p) => ({ id: p.id, pct: prizeDef(p.key)?.pct ?? 0 })).sort((a, b) => b.pct - a.pct)
+  const [couponId, setCouponId] = useState<string | null>(null)
+  const coupon = coupons.find((c) => c.id === couponId)
+  const priceOf = (r: Reward, pct = 0) => Math.round(r.cost * (1 - pct / 100))
+  const bestPct = coupons[0]?.pct ?? 0
 
   const fileRef = useRef<HTMLInputElement>(null)
   const save = () => {
@@ -50,7 +61,7 @@ export default function Shop() {
 
       <div className="grid sm:grid-cols-2 gap-3">
         {[...rewards].sort((a, b) => a.cost - b.cost).map((r) => {
-          const can = stats.spendableXp >= r.cost
+          const can = stats.spendableXp >= priceOf(r, bestPct)
           const owned = purchases.filter((p) => p.rewardId === r.id).length
           return (
             <div key={r.id} className={clsx('card overflow-hidden', can && 'ring-1 ring-lavender-300')}>
@@ -65,7 +76,7 @@ export default function Shop() {
                 {!can && <Progress value={stats.spendableXp / r.cost} className="mt-2" height="h-1.5" />}
               </div>
               <div className="flex flex-col items-end gap-1">
-                <button className={can ? 'btn-primary !py-1.5' : 'btn-soft !py-1.5'} disabled={!can} onClick={() => setConfirmBuy(r)}>{can ? 'Unlock' : `${r.cost - stats.spendableXp} XP to go`}</button>
+                <button className={can ? 'btn-primary !py-1.5' : 'btn-soft !py-1.5'} disabled={!can} onClick={() => { setCouponId(stats.spendableXp >= r.cost ? null : coupons.find((c) => stats.spendableXp >= priceOf(r, c.pct))?.id ?? null); setConfirmBuy(r) }}>{can ? 'Unlock' : `${r.cost - stats.spendableXp} XP to go`}</button>
                 <div className="flex gap-1">
                   <button className="btn-ghost p-1.5" onClick={() => setEdit(r)} aria-label="Edit"><Pencil size={14} /></button>
                   <button className="btn-ghost p-1.5" onClick={() => { if (confirm(`Remove "${r.name}" from the shop?`)) removeReward(r.id) }} aria-label="Remove"><Trash2 size={14} /></button>
@@ -124,9 +135,19 @@ export default function Shop() {
           <div className="text-center">
             <div className="text-5xl">{confirmBuy.emoji}</div>
             <div className="h-display text-xl mt-2">{confirmBuy.name}</div>
-            <div className="text-muted text-sm mt-1">Spend {confirmBuy.cost} XP. You’ll have {stats.spendableXp - confirmBuy.cost} XP left. Level stays the same.</div>
+            <div className="text-muted text-sm mt-1 text-balance">Spend {priceOf(confirmBuy, coupon?.pct)} XP{coupon ? ` (was ${confirmBuy.cost})` : ''}. You’ll have {stats.spendableXp - priceOf(confirmBuy, coupon?.pct)} XP left. Level stays the same.</div>
+            {coupons.length > 0 && (
+              <div className="mt-3 space-y-1.5 text-left">
+                {coupons.map((c) => (
+                  <label key={c.id} className="flex items-center gap-3 rounded-2xl bg-card-2 p-3 text-sm cursor-pointer">
+                    <input type="checkbox" className="size-4 accent-lavender-500 shrink-0" checked={couponId === c.id} onChange={() => setCouponId(couponId === c.id ? null : c.id)} />
+                    <span className="min-w-0">🎟️ Use your {c.pct}% off<span className="block text-xs text-muted">Saves {confirmBuy.cost - priceOf(confirmBuy, c.pct)} XP. From a mystery envelope.</span></span>
+                  </label>
+                ))}
+              </div>
+            )}
             {confirmBuy.budget && <div className="chip bg-gold-300/50 text-ink mt-3">Budget: up to ${confirmBuy.budget}</div>}
-            <button className="btn-primary w-full mt-5" onClick={() => { if (buy(confirmBuy.id)) burst({ big: true }); setConfirmBuy(null) }}>Treat myself</button>
+            <button className="btn-primary w-full mt-5" disabled={stats.spendableXp < priceOf(confirmBuy, coupon?.pct)} onClick={() => { if (buy(confirmBuy.id, coupon?.id)) burst({ big: true }); setConfirmBuy(null); setCouponId(null) }}>{stats.spendableXp < priceOf(confirmBuy, coupon?.pct) ? 'Not enough XP without the discount' : 'Treat myself'}</button>
           </div>
         )}
       </Modal>

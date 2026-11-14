@@ -10,7 +10,8 @@ import { computeStats } from '@/lib/stats'
 import { DEFAULT_REWARDS } from '@/content/rewards'
 import { BADGES } from '@/content/badges'
 import { BOSSES } from '@/content/bosses'
-import { ENVELOPE_DEFS, ENVELOPE_REWARDS } from '@/content/envelopes'
+import { ENVELOPE_DEFS, prizeDef } from '@/content/envelopes'
+import { drawOptions, readyPrizes } from '@/lib/prizes'
 import { useUi } from './ui'
 
 export const STATE_VERSION = 1
@@ -37,6 +38,8 @@ export function initialState(): EraState {
     ],
     spins: [],
     celebrations: {},
+    prizes: [],
+    capsule: null,
     freezes: {},
   }
 }
@@ -65,12 +68,19 @@ export interface Actions {
   toggleBossTask: (bossId: string, taskId: string) => void
   claimBoss: (bossId: string) => void
   saveReflection: (week: number, text: string) => void
-  buyReward: (rewardId: string) => boolean
+  /** Pass a discount prize's id to take its percentage off. */
+  buyReward: (rewardId: string, couponId?: string) => boolean
   redeemPurchase: (purchaseId: string) => void
   addReward: (r: Omit<Reward, 'id' | 'custom'>) => void
   updateReward: (id: string, patch: Partial<Reward>) => void
   removeReward: (id: string) => void
-  openEnvelope: (id: string) => void
+  /** Decide the three prizes inside an envelope. Done once, so reopening can't re-roll them. */
+  drawEnvelope: (id: string) => void
+  chooseEnvelope: (id: string, key: string) => void
+  /** Use a prize that works by itself: tick off a treat or mission, or switch on double XP for today. */
+  redeemPrize: (id: string) => void
+  swapQuest: (date: string, questId: string) => boolean
+  sealCapsule: (text: string) => void
   addWeight: (date: string, value: number) => void
   removeWeight: (date: string) => void
   addPhoto: (date: string, id: string) => void
@@ -120,6 +130,15 @@ function syncShiftBonus(s: EraState, date: string): boolean {
   award(s, id, XP.shiftBonus, `Walked on a ${d.shift} shift`, date)
   return !had
 }
+/** Double XP: an extra entry equal to the day's walk XP (and shift bonus), kept in step as the walk changes. */
+function syncDouble(s: EraState, date: string) {
+  const id = `double:${date}`
+  revoke(s, id)
+  const d = s.days[date]
+  if (!d?.doubleXp || !d.workout) return
+  const amount = (s.xp.find((e) => e.id === `workout:${date}`)?.amount ?? 0) + (s.xp.find((e) => e.id === `shiftbonus:${date}`)?.amount ?? 0)
+  award(s, id, amount, 'Double XP day', date)
+}
 const cleanCalories = (n: number | undefined) => (typeof n === 'number' && isFinite(n) && n > 0 ? Math.round(n) : undefined)
 function lastElectiveHours(s: EraState): ShiftHours {
   const found = Object.values(s.days).filter((d) => d.shift === 'elective' && d.hours).sort((a, b) => b.date.localeCompare(a.date))[0]
@@ -162,6 +181,7 @@ export const useStore = create<Store>()(
             if (shift) d.shiftSet = 'me'; else delete d.shiftSet
             if (shift === 'elective') d.hours = hours ?? d.hours ?? lastElectiveHours(s); else delete d.hours
             if (syncShiftBonus(s, date)) toast(`+${XP.shiftBonus} XP`, 'Shift bonus for that walk')
+            syncDouble(s, date)
             if (loggable && !d.workout && !d.recovery) {
               if (s.freezes[date]) delete s.freezes[date]
               d.recovery = true
@@ -181,6 +201,7 @@ export const useStore = create<Store>()(
               d.shiftSet = 'plan'
               if (p.shift === 'elective') d.hours = { ...(o.hours ?? DEFAULT_ELECTIVE) }; else delete d.hours
               syncShiftBonus(s, p.date)
+              syncDouble(s, p.date)
             }
           })
           return plan.length
@@ -197,7 +218,8 @@ export const useStore = create<Store>()(
           const minutes = Math.max(0, Math.round(w.minutes))
           mutate((s) => {
             const d = day(s, date)
-            const prevXp = (s.xp.find((e) => e.id === `workout:${date}`)?.amount ?? 0) + (s.xp.find((e) => e.id === `shiftbonus:${date}`)?.amount ?? 0)
+            const earned = () => ['workout', 'shiftbonus', 'double'].reduce((a, k) => a + (s.xp.find((e) => e.id === `${k}:${date}`)?.amount ?? 0), 0)
+            const prevXp = earned()
             if (s.freezes[date]) delete s.freezes[date]
             // Editing keeps the original time, so the walk-plan can learn when you usually walk.
             d.workout = { kind: walkKind(minutes), minutes, incline: w.incline, speed: w.speed, theme: w.theme, notes: w.notes, calories: d.workout?.calories, loggedAt: d.workout?.loggedAt ?? new Date().toISOString() }
@@ -206,11 +228,14 @@ export const useStore = create<Store>()(
             revoke(s, `workout:${date}`)
             award(s, `workout:${date}`, xp, `${minutes}-minute walk`, date)
             syncShiftBonus(s, date)
+            syncDouble(s, date)
             const bonus = s.xp.find((e) => e.id === `shiftbonus:${date}`)?.amount ?? 0
-            if (xp + bonus !== prevXp && xp > 0) toast(`+${xp + bonus} XP`, prevXp ? 'Workout updated' : bonus ? `Walk +${xp}, shift bonus +${bonus}. Proud of you.` : 'Workout logged. Proud of you.')
+            const doubled = s.xp.find((e) => e.id === `double:${date}`)?.amount ?? 0
+            const total = earned()
+            if (total !== prevXp && xp > 0) toast(`+${total} XP`, prevXp ? 'Workout updated' : doubled ? `Double XP day: ${xp + bonus} × 2. Proud of you.` : bonus ? `Walk +${xp}, shift bonus +${bonus}. Proud of you.` : 'Workout logged. Proud of you.')
           })
         },
-        removeWorkout: (date) => mutate((s) => { const d = s.days[date]; if (d) { delete d.workout; revoke(s, `workout:${date}`); revoke(s, `shiftbonus:${date}`) } }),
+        removeWorkout: (date) => mutate((s) => { const d = s.days[date]; if (d) { delete d.workout; revoke(s, `workout:${date}`); revoke(s, `shiftbonus:${date}`); revoke(s, `double:${date}`) } }),
 
         logStrength: (date, minutes, notes, calories) => {
           if (!inChallenge(get(), date)) return
@@ -277,14 +302,22 @@ export const useStore = create<Store>()(
           if (text.trim().length >= 20 && award(s, `reflection:${week}`, XP.reflection, `Week ${week} reflection`, todayKey())) toast(`+${XP.reflection} XP`, 'Weekly reflection saved')
         }),
 
-        buyReward: (rewardId) => {
+        buyReward: (rewardId, couponId) => {
           const s = get()
           const r = s.rewards.find((x) => x.id === rewardId)
           if (!r) return false
           const stats = computeStats(s)
-          if (stats.spendableXp < r.cost) { toast('Not enough XP yet', `${r.cost - stats.spendableXp} more to go`, 'warn'); return false }
-          mutate((st) => { st.purchases.push({ id: `p${Date.now()}`, rewardId: r.id, name: r.name, cost: r.cost, at: new Date().toISOString() }) })
-          toast(`Unlocked: ${r.name}`, `-${r.cost} XP. Enjoy it, you earned it.`, 'success')
+          const coupon = couponId ? readyPrizes(s, 'discount', todayKey()).find((p) => p.id === couponId) : undefined
+          const pct = coupon ? prizeDef(coupon.key)?.pct ?? 0 : 0
+          const cost = Math.round(r.cost * (1 - pct / 100))
+          if (stats.spendableXp < cost) { toast('Not enough XP yet', `${cost - stats.spendableXp} more to go`, 'warn'); return false }
+          const now = new Date().toISOString()
+          mutate((st) => {
+            st.purchases.push({ id: `p${Date.now()}`, rewardId: r.id, name: r.name, cost, at: now })
+            const p = coupon && st.prizes.find((x) => x.id === coupon.id)
+            if (p) { p.usedAt = now; p.note = r.name }
+          })
+          toast(`Unlocked: ${r.name}`, `-${cost} XP${pct ? ` with ${pct}% off` : ''}. Enjoy it, you earned it.`, 'success')
           return true
         },
         redeemPurchase: (id) => set((s) => { const p = s.purchases.find((x) => x.id === id); if (p) p.redeemed = p.redeemed ? undefined : new Date().toISOString() }),
@@ -292,17 +325,69 @@ export const useStore = create<Store>()(
         updateReward: (id, patch) => set((s) => { const r = s.rewards.find((x) => x.id === id); if (r) Object.assign(r, patch) }),
         removeReward: (id) => set((s) => { s.rewards = s.rewards.filter((x) => x.id !== id) }),
 
-        openEnvelope: (id) => mutate((s) => {
+        drawEnvelope: (id) => set((s) => {
           const e = s.envelopes[id]
-          if (!e || e.openedAt) return
-          const pool = ENVELOPE_REWARDS
-          const used = new Set(Object.values(s.envelopes).map((x) => x.reward))
-          const fresh = pool.filter((p) => !used.has(p.text))
-          const pick = (fresh.length ? fresh : pool)[Math.floor(Math.random() * (fresh.length ? fresh.length : pool.length))]
-          e.openedAt = new Date().toISOString()
-          e.reward = pick.text
-          if (pick.xp) award(s, `envelope:${id}`, pick.xp, 'Mystery envelope', todayKey())
+          const def = ENVELOPE_DEFS.find((d) => d.id === id)
+          if (!e || !def || e.openedAt || e.options?.length) return
+          e.options = drawOptions(def.tier, s.prizes ?? [])
         }),
+        chooseEnvelope: (id, key) => mutate((s) => {
+          const e = s.envelopes[id]
+          const def = prizeDef(key)
+          if (!e || !def || e.openedAt || !e.options?.includes(key)) return
+          const now = new Date().toISOString()
+          e.openedAt = now
+          e.rewardKey = key
+          e.reward = def.title
+          const prize = { id: `z${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, key, from: id, wonAt: now } as EraState['prizes'][number]
+          if (def.xp) { award(s, `envelope:${id}`, def.xp, 'Mystery envelope', todayKey()); prize.usedAt = now }
+          ;(s.prizes ||= []).push(prize)
+        }),
+        redeemPrize: (id) => {
+          const s0 = get()
+          const p0 = (s0.prizes ?? []).find((x) => x.id === id)
+          const kind = prizeDef(p0?.key)?.kind
+          if (!p0) return
+          const today = todayKey()
+          const now = new Date().toISOString()
+          if (kind === 'treat' || kind === 'mission') {
+            set((s) => { const p = s.prizes.find((x) => x.id === id)!; if (p.usedAt) delete p.usedAt; else p.usedAt = now })
+            return
+          }
+          if (kind !== 'double' || !readyPrizes(s0, 'double', today).some((x) => x.id === id)) return
+          if (!inChallenge(s0, today)) { toast('Not right now', 'Double XP can be switched on during the challenge', 'warn'); return }
+          const active = s0.days[today]?.doubleXp
+          if (active && (s0.prizes ?? []).some((x) => x.id === active)) { toast('Double XP is already on today', undefined, 'info'); return }
+          mutate((s) => {
+            const p = s.prizes.find((x) => x.id === id)!
+            day(s, today).doubleXp = id
+            p.usedOn = today
+            p.usedAt = now
+            syncDouble(s, today)
+          })
+          toast('Double XP is on for today', s0.days[today]?.workout ? 'Today’s walk has been doubled' : 'Your walk today earns double', 'success')
+        },
+        swapQuest: (date, questId) => {
+          const s0 = get()
+          const prize = readyPrizes(s0, 'swap', todayKey())[0]
+          if (!prize || date !== todayKey() || !inChallenge(s0, date) || s0.days[date]?.quests?.[questId] || questId === 'hydrate') return false
+          const now = new Date().toISOString()
+          set((s) => {
+            const d = day(s, date)
+            ;(d.swaps ||= []).push(questId)
+            const p = s.prizes.find((x) => x.id === prize.id)!
+            p.usedAt = now; p.usedOn = date; p.note = questId
+          })
+          toast('Quest swapped', 'A fresh one has taken its place', 'success')
+          return true
+        },
+        sealCapsule: (text) => {
+          const clean = text.trim().slice(0, 4000)
+          if (!clean || get().capsule) return
+          const stats = computeStats(get())
+          set((s) => { s.capsule = { text: clean, sealedAt: new Date().toISOString(), day: stats.displayDay } })
+          toast('Letter sealed', 'It comes back to you on Day 90', 'success')
+        },
 
         addWeight: (date, value) => set((s) => { s.weights = [...s.weights.filter((w) => w.date !== date), { date, value }].sort((a, b) => a.date.localeCompare(b.date)) }),
         removeWeight: (date) => set((s) => { s.weights = s.weights.filter((w) => w.date !== date) }),
@@ -321,9 +406,16 @@ export const useStore = create<Store>()(
           const d = s.days[date]
           if (d?.workout || d?.recovery || s.freezes[date]) return false
           const ch = chapterOf(dayNumber(s.profile.startDate, date))
-          if (stats.freezesLeftByChapter[ch - 1] <= 0) { toast('No freezes left this chapter', 'You get one per chapter', 'warn'); return false }
-          mutate((st) => { st.freezes[date] = new Date().toISOString() })
-          toast('Streak freeze used', 'That day no longer breaks your streak', 'success')
+          // The chapter's own freeze goes first; an envelope freeze covers the day once that is gone.
+          const prize = stats.freezesLeftByChapter[ch - 1] > 0 ? undefined : readyPrizes(s, 'freeze', todayKey())[0]
+          if (stats.freezesLeftByChapter[ch - 1] <= 0 && !prize) { toast('No freezes left this chapter', 'You get one per chapter', 'warn'); return false }
+          const now = new Date().toISOString()
+          mutate((st) => {
+            st.freezes[date] = now
+            const p = prize && st.prizes.find((x) => x.id === prize.id)
+            if (p) { p.usedOn = date; p.usedAt = now }
+          })
+          toast(prize ? 'Envelope freeze used' : 'Streak freeze used', 'That day no longer breaks your streak', 'success')
           return true
         },
         removeFreeze: (date) => mutate((s) => { delete s.freezes[date] }),
@@ -355,7 +447,7 @@ export const useStore = create<Store>()(
             const data = JSON.parse(raw)
             if (!data || typeof data !== 'object' || !data.profile || !data.days) return { ok: false, error: 'That file doesn’t look like a 90-Day Era export.' }
             const base = initialState()
-            set(() => ({ ...base, ...data, photos: Array.isArray(data.photos) ? data.photos : [], version: STATE_VERSION }))
+            set(() => ({ ...base, ...data, photos: Array.isArray(data.photos) ? data.photos : [], prizes: Array.isArray(data.prizes) ? data.prizes : [], capsule: data.capsule ?? null, version: STATE_VERSION }))
             return { ok: true }
           } catch {
             return { ok: false, error: 'Could not read that file.' }
@@ -371,6 +463,8 @@ export const useStore = create<Store>()(
         const p = (persisted ?? {}) as Partial<EraState>
         const merged = { ...current, ...p } as Store
         if (!Array.isArray(merged.photos)) merged.photos = []
+        if (!Array.isArray(merged.prizes)) merged.prizes = []
+        if (merged.capsule === undefined) merged.capsule = null
         // backfill budgets on untouched default rewards
         merged.rewards = (merged.rewards || []).map((r) => {
           const def = DEFAULT_REWARDS.find((d) => d.id === r.id)
@@ -402,7 +496,7 @@ export function snapshot(): EraState {
 
 /** Replace all saved data with a copy from elsewhere (cloud sync). Missing fields fall back to defaults. */
 export function applySnapshot(data: Partial<EraState>) {
-  useStore.setState({ ...initialState(), ...data, photos: Array.isArray(data.photos) ? data.photos : [], version: STATE_VERSION })
+  useStore.setState({ ...initialState(), ...data, photos: Array.isArray(data.photos) ? data.photos : [], prizes: Array.isArray(data.prizes) ? data.prizes : [], capsule: data.capsule ?? null, version: STATE_VERSION })
 }
 
 export function exportJson(): string {
