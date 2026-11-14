@@ -36,6 +36,7 @@ export function nextEnvelope(stats: Stats, envelopes: Record<string, Envelope>):
   for (const def of ENVELOPE_DEFS) {
     if (envelopes[def.id]) continue
     const t = def.trigger
+    if (t.type === 'secret') continue // never hinted at
     let distance: number
     let need: string
     if (t.type === 'day') {

@@ -429,6 +429,7 @@ export const useStore = create<Store>()(
             const t = e.trigger
             if (t.type === 'day') return stats.currentDay >= t.value && stats.daysLogged >= Math.ceil(t.value / 3)
             if (t.type === 'workouts') return stats.workouts >= t.value
+            if (t.type === 'secret') return stats.secrets[t.key]
             return stats.bestStreak >= t.value
           })
           if (!newBadges.length && !newEnvelopes.length) return
@@ -439,7 +440,7 @@ export const useStore = create<Store>()(
           })
           const ui = useUi.getState()
           for (const b of newBadges) ui.pushUnlock({ id: b.id, name: b.name, emoji: b.emoji, desc: b.desc, kind: 'badge' })
-          for (const e of newEnvelopes) ui.pushToast({ title: 'Mystery envelope unlocked', sub: e.title, kind: 'success' })
+          for (const e of newEnvelopes) ui.pushToast({ title: e.trigger.type === 'secret' ? 'You found a secret envelope' : 'Mystery envelope unlocked', sub: e.title, kind: 'success' })
         },
 
         importData: (raw) => {

@@ -4,7 +4,7 @@ import { clsx } from 'clsx'
 import { motion } from 'framer-motion'
 import { useStore } from '@/store/useStore'
 import { useStats } from '@/lib/hooks'
-import { ENVELOPE_DEFS, TIERS, prizeDef, LEGACY_REWARD_EMOJI, type EnvelopeDef } from '@/content/envelopes'
+import { ENVELOPE_DEFS, TIERS, prizeDef, isSecret, LEGACY_REWARD_EMOJI, type EnvelopeDef } from '@/content/envelopes'
 import { prizeUsed } from '@/lib/prizes'
 import { formatDate } from '@/lib/dates'
 import type { Prize } from '@/lib/types'
@@ -13,6 +13,7 @@ import { burst, hearts } from './Celebrate'
 
 const hintFor = (def: EnvelopeDef) => {
   const t = def.trigger
+  if (t.type === 'secret') return 'A secret. No hints.'
   return t.type === 'day' ? `Reach Day ${t.value} with ${Math.ceil(t.value / 3)}+ active days` : t.type === 'workouts' ? `${t.value} workouts` : `${t.value}-day streak`
 }
 
@@ -88,6 +89,7 @@ function PickModal({ id, onClose }: { id: string | null; onClose: () => void }) 
               {won?.xp && <div className="gradient-text font-bold mt-2">+{won.xp} XP added</div>}
               {legacy && <p className="text-xs text-muted mt-2">Opened before rewards could be kept. This one is on your honour.</p>}
               {won && !won.xp && wonPrize && <p className="text-xs text-muted mt-2">Kept in My rewards below until you use it.</p>}
+              {def.found && <p className="text-xs mt-3 rounded-2xl bg-card-2 p-3 text-balance"><span className="font-semibold">Secret found.</span> {def.found}</p>}
               {id === 'day90' && <div className="mt-4"><CapsuleLetter /></div>}
               <button className="btn-primary w-full mt-5" onClick={close}>{picked !== null ? (won?.xp ? 'Lovely' : 'Add to my rewards') : 'Close'}</button>
             </motion.div>
@@ -104,9 +106,11 @@ export function EnvelopeGrid() {
   const drawEnvelope = useStore((s) => s.drawEnvelope)
   const [open, setOpen] = useState<string | null>(null)
   const ready = Object.values(envelopes).filter((e) => !e.openedAt).length
+  const secretsFound = ENVELOPE_DEFS.filter((d) => isSecret(d) && envelopes[d.id]).length
+  const secretsTotal = ENVELOPE_DEFS.filter(isSecret).length
   return (
     <section>
-      <SectionTitle sub={ready ? `${ready} ready to open` : 'Bigger milestones hold better rewards.'}>Mystery envelopes</SectionTitle>
+      <SectionTitle sub={`${ready ? `${ready} ready to open` : 'Bigger milestones hold better rewards'} · ${secretsFound} of ${secretsTotal} secrets found`}>Mystery envelopes</SectionTitle>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {ENVELOPE_DEFS.map((def) => {
           const e = envelopes[def.id]
@@ -117,11 +121,11 @@ export function EnvelopeGrid() {
               onClick={() => { if (state === 'ready') drawEnvelope(def.id); setOpen(def.id) }}
               className={clsx('card p-3.5 text-left relative overflow-hidden min-w-0 flex flex-col', state === 'ready' && `ring-2 shadow-glow ${TIERS[def.tier].ring}`, state === 'locked' && 'opacity-70')}>
               <motion.div animate={state === 'ready' ? { y: [0, -4, 0] } : {}} transition={{ repeat: Infinity, duration: 1.8 }} className="text-4xl leading-none">
-                {state === 'opened' ? (won?.emoji ?? LEGACY_REWARD_EMOJI[e!.reward ?? ''] ?? '💌') : state === 'ready' ? TIERS[def.tier].emoji : '🔒'}
+                {state === 'opened' ? (won?.emoji ?? LEGACY_REWARD_EMOJI[e!.reward ?? ''] ?? '💌') : state === 'ready' ? TIERS[def.tier].emoji : isSecret(def) ? '❔' : '🔒'}
               </motion.div>
               <div className="mt-2.5"><TierChip tier={def.tier} /></div>
-              <div className="font-semibold text-sm mt-1.5 leading-tight break-words">{def.title}</div>
-              <div className="text-xs text-muted mt-0.5 break-words">{state === 'locked' ? hintFor(def) : state === 'ready' ? 'Tap to open' : 'Opened'}</div>
+              <div className="font-semibold text-sm mt-1.5 leading-tight break-words">{state === 'locked' && isSecret(def) ? '???' : def.title}</div>
+              <div className="text-xs text-muted mt-0.5 break-words">{state === 'locked' ? hintFor(def) : state === 'ready' ? (isSecret(def) ? 'Secret found. Tap to open' : 'Tap to open') : 'Opened'}</div>
               {state === 'opened' && <div className="text-xs mt-1.5 text-lavender-600 dark:text-lavender-300 line-clamp-2 break-words">{won?.title ?? e!.reward}</div>}
             </motion.button>
           )

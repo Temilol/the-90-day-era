@@ -2,6 +2,8 @@ import type { DayLog, EraState, ShiftType } from './types'
 import { TOTAL_DAYS, addDays, dayNumber, dateForDay, todayKey, weekOf, chapterOf, parseKey } from './dates'
 import { levelFor } from './xp'
 import { SELF_CARE_IDS } from '@/content/quests'
+import { BOSSES } from '@/content/bosses'
+import type { SecretKey } from '@/content/envelopes'
 
 export const FREEZES_PER_CHAPTER = 1
 
@@ -56,6 +58,7 @@ export interface Stats {
   freezesLeft: number // in the current chapter
   freezesLeftByChapter: number[]
   bonusFreezes: number // unused extra freezes won from envelopes
+  secrets: Record<SecretKey, boolean> // which secret-envelope conditions have been met
 }
 
 export function isActiveDay(d?: DayLog): boolean {
@@ -177,6 +180,20 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
     }
   }
 
+  // Secret envelopes. Nothing in the app hints at these.
+  const walked = (d: DayLog) => !!d.workout && d.workout.minutes >= 5
+  const written = (d: DayLog) => !!d.journal && Object.values(d.journal).some((v) => v && v !== d.journal!.updatedAt)
+  const secrets: Stats['secrets'] = {
+    showedUp: logs.some((d) => walked(d) && d.workout!.minutes < 20 && (d.shift === 'day' || d.shift === 'night')),
+    restWalk: logs.some((d) => walked(d) && d.shift === 'recovery'),
+    perfectDay: logs.some((d) => walked(d) && !!d.strength && !!d.bonusMission?.done && written(d) && Object.keys(d.quests || {}).length >= 4),
+    goingLong: workoutsList.filter((d) => d.workout!.minutes > 30).length >= 10,
+    perfectWeek: weekly.some((w) => {
+      const boss = BOSSES.find((b) => b.week === w.week)
+      return w.workouts >= 6 && w.strength >= 4 && s.xp.some((e) => e.id === `reflection:${w.week}`) && !!boss && s.xp.some((e) => e.id === `boss:${boss.id}`)
+    }),
+  }
+
   const daysLogged = activeDates.size
   // Freezes paid for by an envelope prize don't use up the chapter's own allowance.
   const freezePrizes = (s.prizes ?? []).filter((p) => p.key === 'freeze')
@@ -192,7 +209,7 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
     streak, bestStreak, lifetimeXp, spentXp, spendableXp, level: levelFor(lifetimeXp),
     questsCompleted, questCounts, selfCareQuests, journalEntries, nightShiftWorkouts, dayShiftWorkouts, byShift, calories, otherActivities,
     bossesDefeated, reflections, purchases: s.purchases.length, spins: s.spins.length, envelopesOpened,
-    comebacks, themesUsed, bonusMissions, weekly, nsvs: s.nsvs.length, weights: s.weights.length, activeDates, frozenDates, freezesLeft, freezesLeftByChapter, bonusFreezes,
+    comebacks, themesUsed, bonusMissions, weekly, nsvs: s.nsvs.length, weights: s.weights.length, activeDates, frozenDates, freezesLeft, freezesLeftByChapter, bonusFreezes, secrets,
   }
 }
 

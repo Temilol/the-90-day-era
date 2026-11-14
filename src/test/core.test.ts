@@ -552,3 +552,80 @@ describe('envelopes: tiers, pick one of three, prizes you keep', () => {
     expect(nextEnvelope(computeStats(st, addDays(day1, 3)), { day7: { id: 'day7', unlockedAt: 'x' } })).toEqual({ title: 'Seven-Day Streak', need: '3 more days in a row' })
   })
 })
+
+describe('secret envelopes', () => {
+  const day1 = '2026-01-01'
+  const fresh = () => useStore.setState({ ...initialState(), profile: { name: 'T', startDate: day1, units: 'lb', onboarded: true } })
+  const secrets = () => computeStats(useStore.getState(), '2026-02-15').secrets
+  const has = (id: string) => !!useStore.getState().envelopes[id]
+
+  it('starts with none found and never appears in the next-envelope hint', async () => {
+    const { nextEnvelope } = await import('@/lib/prizes')
+    const { ENVELOPE_DEFS, isSecret } = await import('@/content/envelopes')
+    fresh()
+    expect(Object.values(secrets()).some(Boolean)).toBe(false)
+    expect(ENVELOPE_DEFS.filter(isSecret).map((d) => d.tier).sort()).toEqual(['common', 'common', 'legendary', 'rare', 'rare'])
+    const all = Object.fromEntries(ENVELOPE_DEFS.filter((d) => !isSecret(d)).map((d) => [d.id, { id: d.id, unlockedAt: 'x' }]))
+    expect(nextEnvelope(computeStats(useStore.getState(), day1), all)).toBeNull()
+  })
+  it('Showed Up Anyway: a short walk on a day or night shift', () => {
+    fresh()
+    const s = useStore.getState()
+    s.setShift(day1, 'off'); s.logWorkout(day1, { minutes: 10, incline: 12, speed: 3 })
+    s.setShift('2026-01-02', 'elective'); s.logWorkout('2026-01-02', { minutes: 10, incline: 12, speed: 3 })
+    s.setShift('2026-01-03', 'night'); s.logWorkout('2026-01-03', { minutes: 20, incline: 12, speed: 3 })
+    expect(secrets().showedUp).toBe(false)
+    s.logWorkout('2026-01-03', { minutes: 19, incline: 12, speed: 3 })
+    expect(secrets().showedUp).toBe(true)
+    expect(has('secret-showed-up')).toBe(true)
+  })
+  it('Couldn’t Sit Still: a walk on a planned rest day', () => {
+    fresh()
+    const s = useStore.getState()
+    s.fillShifts({ from: day1, to: day1, pattern: ['recovery'], keepMine: true })
+    expect(secrets().restWalk).toBe(false)
+    s.logWorkout(day1, { minutes: 30, incline: 12, speed: 3 })
+    expect(secrets().restWalk).toBe(true)
+    expect(has('secret-rest-walk')).toBe(true)
+  })
+  it('The Perfect Day needs every piece on the same day', () => {
+    fresh()
+    const s = useStore.getState()
+    s.logWorkout(day1, { minutes: 30, incline: 12, speed: 3 })
+    for (const q of ['hydrate', 'nourish', 'protein', 'stretch']) s.toggleQuest(day1, q)
+    s.setBonusMission(day1, 'Dance break', 'Wheel'); s.completeBonusMission(day1)
+    s.saveJournal(day1, { mood: 'good' })
+    expect(secrets().perfectDay).toBe(false) // no strength yet
+    s.logStrength('2026-01-02', 10) // on a different day doesn't count
+    expect(secrets().perfectDay).toBe(false)
+    s.logStrength(day1, 10)
+    expect(secrets().perfectDay).toBe(true)
+    expect(has('secret-perfect-day')).toBe(true)
+  })
+  it('Going Long: ten walks over 30 minutes', () => {
+    fresh()
+    const s = useStore.getState()
+    for (let i = 0; i < 9; i++) s.logWorkout(addDays(day1, i), { minutes: 35, incline: 12, speed: 3 })
+    s.logWorkout(addDays(day1, 9), { minutes: 30, incline: 12, speed: 3 })
+    expect(secrets().goingLong).toBe(false)
+    s.logWorkout(addDays(day1, 9), { minutes: 31, incline: 12, speed: 3 })
+    expect(secrets().goingLong).toBe(true)
+  })
+  it('The Perfect Week: 6 walks, 4 strength, the reflection and the boss in one week', async () => {
+    const { BOSSES } = await import('@/content/bosses')
+    fresh()
+    const s = useStore.getState()
+    const week2 = (i: number) => addDays(day1, 7 + i)
+    for (let i = 0; i < 6; i++) s.logWorkout(week2(i), { minutes: 30, incline: 12, speed: 3 })
+    for (let i = 0; i < 4; i++) s.logStrength(week2(i), 10)
+    s.saveReflection(2, 'A solid week with a lot of walking in it.')
+    s.claimBoss(BOSSES.find((b) => b.week === 1)!.id) // the wrong week's boss
+    expect(secrets().perfectWeek).toBe(false)
+    s.claimBoss(BOSSES.find((b) => b.week === 2)!.id)
+    expect(secrets().perfectWeek).toBe(true)
+    expect(has('secret-perfect-week')).toBe(true)
+    s.removeWorkout(week2(0)) // an envelope once found stays found
+    expect(secrets().perfectWeek).toBe(false)
+    expect(has('secret-perfect-week')).toBe(true)
+  })
+})
