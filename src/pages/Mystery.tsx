@@ -60,7 +60,7 @@ export default function Mystery() {
       <MyRewards />
       <TimeCapsule />
 
-      <section>
+      <section id="wheel" className="scroll-mt-4">
         <SectionTitle sub="Pick a category and spin. One result a day can become your bonus mission for +10 XP.">Spin the wheel</SectionTitle>
         <Card>
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">

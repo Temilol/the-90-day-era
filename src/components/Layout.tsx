@@ -43,7 +43,13 @@ export function Layout() {
     mq.addEventListener('change', fn)
     return () => mq.removeEventListener('change', fn)
   }, [theme])
-  useEffect(() => { setMore(false); window.scrollTo({ top: 0 }) }, [loc.pathname])
+  useEffect(() => {
+    setMore(false)
+    // A link such as /mystery#wheel lands on that section; any other move starts at the top.
+    const target = loc.hash ? document.getElementById(loc.hash.slice(1)) : null
+    if (target) target.scrollIntoView({ block: 'start' })
+    else window.scrollTo({ top: 0 })
+  }, [loc.pathname, loc.hash])
   useEffect(() => { useStore.getState().checkProgress() }, [stats.today])
 
   return (
