@@ -4,6 +4,8 @@ import { useStore, exportJson } from '@/store/useStore'
 import { useUi, type Theme } from '@/store/ui'
 import { useStats } from '@/lib/hooks'
 import { todayKey, addDays, formatDate } from '@/lib/dates'
+import { resetTimes } from '@/lib/dayReset'
+import { ResetSelect } from '@/components/DayReset'
 import { PageHeader, Card, SectionTitle, Modal } from '@/components/ui'
 import { Download, Upload, Moon, Sun, Monitor, Vibrate, EyeOff, Images } from 'lucide-react'
 import { downloadAllPhotos } from '@/store/photos'
@@ -35,6 +37,7 @@ export default function SettingsPage() {
   }
   const stats = useStats()
   const ws = waterSettings(profile)
+  const reset = resetTimes(profile)
   const [goalText, setGoalText] = useState(String(fromMl(ws.goalMl, ws.unit)))
   const [bottleText, setBottleText] = useState(String(fromMl(ws.bottleMl, ws.unit)))
   const [stepText, setStepText] = useState(String(stepGoalOf(profile)))
@@ -113,6 +116,17 @@ export default function SettingsPage() {
             <button role="switch" aria-checked={ws.nudges} aria-label="Hydration nudges" onClick={() => setProfile({ waterNudges: !ws.nudges })} className={clsx('w-11 h-6 rounded-full relative transition shrink-0', ws.nudges ? 'bg-gradient-to-r from-lavender-500 to-blush-400' : 'bg-line')}><span className={clsx('absolute top-0.5 size-5 rounded-full bg-white shadow transition', ws.nudges ? 'left-5.5' : 'left-0.5')} /></button>
           </div>
           <p className="text-xs text-muted">A new goal applies from your next drink. Days already completed stay as they are.</p>
+        </Card>
+      </section>
+
+      <section>
+        <SectionTitle sub="Water, quests, steps and walks all start fresh at this time.">When your day resets</SectionTitle>
+        <Card className="space-y-4">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div><label className="label">Most days</label><ResetSelect name="Reset time on most days" value={reset.day} onChange={(m) => setProfile({ dayReset: m, nightReset: reset.night, resetAsked: true })} /></div>
+            <div><label className="label">After a night shift</label><ResetSelect name="Reset time after a night shift" value={reset.night} onChange={(m) => setProfile({ nightReset: m, resetAsked: true })} /></div>
+          </div>
+          <p className="text-xs text-muted">A later time after a night shift keeps the whole shift on one day, so a drink at 3 AM still counts toward the day the shift started. Changes apply from now on. Days already logged stay as they are.</p>
         </Card>
       </section>
 

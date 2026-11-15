@@ -5,7 +5,8 @@ import type { DayLog, EraState, JournalEntry, Reminder, Reward, ShiftHours, Shif
 import { DEFAULT_ELECTIVE } from '@/lib/walkPlan'
 import { planFill, type FillOptions } from '@/lib/schedule'
 import { waterSettings, goalMet } from '@/lib/water'
-import { todayKey, dayNumber, TOTAL_DAYS, weekOf, chapterOf } from '@/lib/dates'
+import { todayKey, dayNumber, TOTAL_DAYS, weekOf, chapterOf, setDayResolver } from '@/lib/dates'
+import { appDay, resetTimes } from '@/lib/dayReset'
 import { XP, walkXp, walkKind, levelFor, earnsShiftBonus, ACTIVITY_MIN_MINUTES, LEVEL_EMOJI } from '@/lib/xp'
 import { computeStats } from '@/lib/stats'
 import { DEFAULT_REWARDS, PRICE_REV, FIRST_PRICES } from '@/content/rewards'
@@ -597,6 +598,12 @@ export const useStore = create<Store>()(
     },
   ),
 )
+
+// From here on, "today" follows the person's reset times: a night-shift day can run into the next morning.
+setDayResolver((when) => {
+  const s = useStore.getState()
+  return appDay(when, resetTimes(s.profile), (date) => s.days[date]?.shift)
+})
 
 /** Just the saved data, without the action functions. */
 export function snapshot(): EraState {

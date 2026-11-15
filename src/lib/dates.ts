@@ -1,6 +1,6 @@
 export const TOTAL_DAYS = 90
 
-/** Local-date ISO key (yyyy-mm-dd). Rollover at local midnight. */
+/** Calendar-date ISO key (yyyy-mm-dd) for a moment. For "which day is in progress", use todayKey or dayKeyAt. */
 export function toKey(d: Date = new Date()): string {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -48,8 +48,18 @@ export function formatDate(key: string, opts: Intl.DateTimeFormatOptions = { wee
   return parseKey(key).toLocaleDateString(undefined, opts)
 }
 
+let resolver: ((when: Date) => string) | null = null
+/** The store registers how a moment maps to a day, so a day can end later than midnight (see dayReset.ts). */
+export function setDayResolver(fn: ((when: Date) => string) | null) { resolver = fn }
+
+/** The day a moment counts toward. The same as its calendar date unless a later reset time is set. */
+export function dayKeyAt(when: Date): string {
+  return resolver ? resolver(when) : toKey(when)
+}
+
+/** The day in progress right now. */
 export function todayKey(): string {
-  return toKey(new Date())
+  return dayKeyAt(new Date())
 }
 
 /** Deterministic pseudo-random in [0,1) from a string seed. */

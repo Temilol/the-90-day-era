@@ -4,6 +4,7 @@ import { useStats, quoteFor } from '@/lib/hooks'
 import { formatDate, TOTAL_DAYS } from '@/lib/dates'
 import { ShiftPicker, WorkoutCard, QuestList } from '@/components/DayPanel'
 import { WalkPlanCard } from '@/components/WalkPlan'
+import { DayResetBanner } from '@/components/DayReset'
 import { Card, PageHeader, SectionTitle } from '@/components/ui'
 import { CHAPTERS } from '@/content/chapters'
 import { BookHeart, Gift } from 'lucide-react'
@@ -35,6 +36,7 @@ export default function Today() {
   return (
     <div className="space-y-6">
       <PageHeader title="Today’s Mission" emoji="🎯" sub={`Day ${stats.displayDay} of ${TOTAL_DAYS} · ${formatDate(today, { weekday: 'long', month: 'long', day: 'numeric' })} · ${chapter.emoji} ${chapter.name}`} />
+      <DayResetBanner />
 
       <section>
         <SectionTitle sub="Your shift sets today’s walk plan and shapes one of your quests." action={<Link to="/shifts" className="btn-soft !py-1.5 text-xs">Fill in schedule</Link>}>1. What kind of day is it?</SectionTitle>

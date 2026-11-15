@@ -18,6 +18,7 @@ import { nextEnvelope } from '@/lib/prizes'
 import { CAPSULE_FROM_DAY, CAPSULE_UNTIL_DAY } from '@/components/Envelopes'
 import { SHIFTS } from '@/components/DayPanel'
 import { ArrowRight, Flame, Sparkles as SparkIcon, Swords, Gift, CalendarDays, BookHeart, ShoppingBag, Trophy } from 'lucide-react'
+import { DayResetBanner } from '@/components/DayReset'
 
 export default function Dashboard() {
   const stats = useStats()
@@ -60,6 +61,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      <DayResetBanner />
       <div className="flex items-end justify-between gap-3">
         <div>
           <div className="text-muted">{greeting(profile.name)} 💗</div>

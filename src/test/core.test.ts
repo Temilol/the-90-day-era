@@ -998,3 +998,82 @@ describe('shop prices', () => {
     expect(useStore.getState().priceRev).toBe(2)
   })
 })
+
+describe('day reset times', () => {
+  const shifts: Record<string, 'day' | 'night' | 'off'> = { '2026-01-02': 'night', '2026-01-03': 'night', '2026-01-04': 'off' } // Fri, Sat nights; Sun off
+  const shiftOf = (d: string) => shifts[d]
+  const at = (day: number, h: number, m = 0) => new Date(2026, 0, day, h, m)
+
+  it('keeps midnight unless a time is chosen, and the night time follows the everyday one until set', async () => {
+    const { resetTimes, appDay } = await import('@/lib/dayReset')
+    expect(resetTimes({})).toEqual({ day: 0, night: 0 })
+    expect(resetTimes({ dayReset: 240 })).toEqual({ day: 240, night: 240 })
+    expect(resetTimes({ dayReset: 0, nightReset: 420 })).toEqual({ day: 0, night: 420 })
+    expect(resetTimes({ nightReset: 5000 }).night).toBe(720) // never later than noon
+    expect(appDay(at(3, 3), resetTimes({}), shiftOf)).toBe('2026-01-03')
+  })
+
+  it('keeps a whole night shift on the day it started, then hands over at the chosen time', async () => {
+    const { appDay, carryOver, dayEnd, minutesInto } = await import('@/lib/dayReset')
+    const r = { day: 0, night: 420 }
+    expect(appDay(at(2, 23, 59), r, shiftOf)).toBe('2026-01-02')
+    expect(appDay(at(3, 3), r, shiftOf)).toBe('2026-01-02') // 3 AM on the shift still counts as Friday
+    expect(appDay(at(3, 6, 59), r, shiftOf)).toBe('2026-01-02')
+    expect(appDay(at(3, 7), r, shiftOf)).toBe('2026-01-03')
+    expect(appDay(at(4, 6, 59), r, shiftOf)).toBe('2026-01-03') // second night in a row
+    expect(appDay(at(4, 7), r, shiftOf)).toBe('2026-01-04')
+    expect(appDay(at(5, 0, 1), r, shiftOf)).toBe('2026-01-05') // Sunday was a day off, so it ended at midnight
+    expect(carryOver(at(3, 3), r, shiftOf)).toEqual({ date: '2026-01-02', shift: 'night', resetAt: 420 })
+    expect(carryOver(at(3, 9), r, shiftOf)).toBeNull()
+    expect(dayEnd('2026-01-02', r, shiftOf).getTime()).toBe(at(3, 7).getTime())
+    expect(dayEnd('2026-01-04', r, shiftOf).getTime()).toBe(at(5, 0).getTime())
+    expect(minutesInto('2026-01-02', at(3, 3))).toBe(27 * 60)
+  })
+
+  it('uses the everyday time on days that are not night shifts', async () => {
+    const { appDay } = await import('@/lib/dayReset')
+    const r = { day: 240, night: 420 }
+    expect(appDay(at(5, 3, 59), r, shiftOf)).toBe('2026-01-04')
+    expect(appDay(at(5, 4), r, shiftOf)).toBe('2026-01-05')
+    expect(appDay(at(3, 5), r, shiftOf)).toBe('2026-01-02') // the night time still applies after a night shift
+  })
+
+  it('makes the store’s "today" follow the reset, so water at 3 AM lands on the shift’s day', async () => {
+    const { vi } = await import('vitest')
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(at(3, 3))
+      const base = initialState()
+      useStore.setState({ ...base, profile: { ...base.profile, name: 'T', startDate: '2026-01-01', onboarded: true, nightReset: 420 }, days: { '2026-01-02': { date: '2026-01-02', quests: {}, shift: 'night' } } })
+      expect(todayKeyForTest()).toBe('2026-01-02')
+      useStore.getState().addWater(todayKeyForTest(), 500)
+      expect(useStore.getState().days['2026-01-02'].water).toBe(500)
+      expect(useStore.getState().days['2026-01-03']).toBeUndefined()
+      expect(computeStats(useStore.getState()).today).toBe('2026-01-02')
+      vi.setSystemTime(at(3, 7))
+      expect(todayKeyForTest()).toBe('2026-01-03')
+      // with no time chosen, nothing changes from before
+      vi.setSystemTime(at(3, 3))
+      useStore.setState({ profile: { ...useStore.getState().profile, nightReset: undefined } })
+      expect(todayKeyForTest()).toBe('2026-01-03')
+    } finally {
+      vi.useRealTimers()
+      useStore.setState(initialState())
+    }
+  })
+
+  it('sends the second water nudge of a night shift after midnight, counted against the shift’s day', async () => {
+    const { buildReminderQueue } = await import('@/lib/reminderQueue')
+    const base = initialState()
+    const state = (nightReset?: number) => ({
+      ...base,
+      profile: { ...base.profile, startDate: '2026-01-01', onboarded: true, walkReminders: false, nightReset },
+      days: { '2026-01-02': { date: '2026-01-02', quests: {}, shift: 'night' as const } },
+    })
+    const local = (iso: string) => { const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}` }
+    const nudges = (s: ReturnType<typeof state>, now: Date) => buildReminderQueue(s, now, 1).filter((r) => r.title === 'Water check').map((r) => local(r.fire_at))
+    expect(nudges(state(), at(2, 12))).toEqual(['1/2 22:00']) // as before: the 2 AM one is past midnight
+    expect(nudges(state(420), at(2, 12))).toEqual(['1/2 22:00', '1/3 2:00'])
+    expect(nudges(state(420), at(3, 1))).toEqual(['1/3 2:00']) // built from Friday even though the calendar says Saturday
+  })
+})

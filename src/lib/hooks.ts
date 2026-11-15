@@ -7,8 +7,12 @@ import { THEMES } from '@/content/themes'
 import type { ShiftType } from './types'
 import { QUOTES } from '@/content/quotes'
 
-/** Today's date key, re-evaluated every minute so midnight rollover works while the app is open. */
+/**
+ * The day in progress, re-checked every half minute so the rollover works while the app is open,
+ * and straight away when a shift or reset time changes.
+ */
 export function useToday(): string {
+  const fromStore = useStore(() => todayKey())
   const [t, setT] = useState(todayKey)
   useEffect(() => {
     const i = setInterval(() => { const k = todayKey(); setT((p) => (p === k ? p : k)) }, 30_000)
@@ -16,7 +20,8 @@ export function useToday(): string {
     document.addEventListener('visibilitychange', onVis)
     return () => { clearInterval(i); document.removeEventListener('visibilitychange', onVis) }
   }, [])
-  return t
+  // Whichever was worked out last wins: both come from the same clock and the same settings.
+  return fromStore === t ? t : todayKey()
 }
 
 export function useStats() {

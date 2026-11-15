@@ -9,6 +9,7 @@ import { useStore } from '@/store/useStore'
 import { useStats } from '@/lib/hooks'
 import { useReminders } from '@/lib/reminders'
 import { ConflictModal } from './Account'
+import { ResetPrompt } from './DayReset'
 
 export const NAV = [
   { to: '/', label: 'Home', icon: Home, end: true },
@@ -71,6 +72,7 @@ export function Layout() {
       <main className="px-4 pt-5 pb-28 lg:pb-10 lg:px-10 max-w-5xl w-full mx-auto">
         <Outlet />
       </main>
+      <ResetPrompt />
 
       {/* Mobile bottom nav */}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-line bg-card/85 backdrop-blur-xl" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>

@@ -13,7 +13,7 @@ import { burst, hearts } from './Celebrate'
 import { tap } from '@/lib/haptics'
 import { Shuffle, Trash2, Flame, Plus, X, Repeat, Footprints } from 'lucide-react'
 import { readyPrizes } from '@/lib/prizes'
-import { todayKey, addDays, dayNumber } from '@/lib/dates'
+import { todayKey, toKey, addDays, dayNumber } from '@/lib/dates'
 
 export const SHIFTS: { id: ShiftType; label: string; short: string; emoji: string; sub: string }[] = [
   { id: 'day', label: 'Day shift', short: 'Day', emoji: '🌤️', sub: '6 AM – 6 PM' },
@@ -201,7 +201,8 @@ export function WorkoutCard({ date, locked }: { date: string; locked?: boolean }
   const yesterdayKey = addDays(date, -1)
   const yesterday = useStore((s) => s.days[yesterdayKey])
   const [toYesterday, setToYesterday] = useState(false)
-  const lateNight = date === todayKey() && new Date().getHours() < 6 && !!startDate && dayNumber(startDate, yesterdayKey) >= 1 && !yesterday?.workout
+  // Only offered when the day in progress is the calendar day: a night-shift day that is still open already takes the walk.
+  const lateNight = date === todayKey() && date === toKey() && new Date().getHours() < 6 && !!startDate && dayNumber(startDate, yesterdayKey) >= 1 && !yesterday?.workout
 
   const done = !!d?.workout
   const complete = (mins: number, inc: number, spd: number, n?: string) => {

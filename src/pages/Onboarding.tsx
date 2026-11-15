@@ -9,6 +9,7 @@ import { AccountPanel } from '@/components/Account'
 import { useSync, syncConfigured } from '@/store/sync'
 import { WATER_DEFAULTS, toMl, type WaterUnit } from '@/lib/water'
 import { DEFAULT_STEP_GOAL } from '@/lib/xp'
+import { ResetSelect } from '@/components/DayReset'
 
 export default function Onboarding() {
   const setProfile = useStore((s) => s.setProfile)
@@ -20,12 +21,14 @@ export default function Onboarding() {
   const [stepGoal, setStepGoal] = useState(String(DEFAULT_STEP_GOAL))
   const [waterGoal, setWaterGoal] = useState(String(WATER_DEFAULTS.oz.goal))
   const pickWaterUnit = (u: WaterUnit) => { if (u !== waterUnit) { setWaterUnit(u); setWaterGoal(String(WATER_DEFAULTS[u].goal)) } }
+  const [dayReset, setDayReset] = useState(0)
+  const [nightReset, setNightReset] = useState(7 * 60)
   const [account, setAccount] = useState(false)
   const signedInEmail = useSync((s) => s.email)
 
   const finish = () => {
     const goal = parseFloat(waterGoal) > 0 ? parseFloat(waterGoal) : WATER_DEFAULTS[waterUnit].goal
-    setProfile({ name: name.trim(), startDate: start, units, onboarded: true, waterUnit, waterGoal: toMl(goal, waterUnit), waterBottle: toMl(WATER_DEFAULTS[waterUnit].bottle, waterUnit), stepGoal: parseFloat(stepGoal) > 0 ? Math.round(parseFloat(stepGoal)) : DEFAULT_STEP_GOAL })
+    setProfile({ name: name.trim(), startDate: start, units, onboarded: true, waterUnit, waterGoal: toMl(goal, waterUnit), waterBottle: toMl(WATER_DEFAULTS[waterUnit].bottle, waterUnit), stepGoal: parseFloat(stepGoal) > 0 ? Math.round(parseFloat(stepGoal)) : DEFAULT_STEP_GOAL, dayReset, nightReset, resetAsked: true })
     burst({ big: true })
   }
 
@@ -85,6 +88,14 @@ export default function Onboarding() {
                 <label className="label">Daily step goal</label>
                 <input type="number" inputMode="numeric" min={1} className="input text-base" aria-label="Daily step goal" value={stepGoal} onChange={(e) => setStepGoal(e.target.value)} />
                 <p className="text-xs text-muted mt-2">Optional. You type in your steps from your watch or phone. It’s tracked for your stats and earns no XP. Change the goal in Settings.</p>
+              </div>
+              <div>
+                <label className="label">When your day resets</label>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div><div className="text-xs text-muted mb-1">Most days</div><ResetSelect name="Reset time on most days" value={dayReset} onChange={setDayReset} /></div>
+                  <div><div className="text-xs text-muted mb-1">After a night shift</div><ResetSelect name="Reset time after a night shift" value={nightReset} onChange={setNightReset} /></div>
+                </div>
+                <p className="text-xs text-muted mt-2">Your water, quests and steps start fresh at this time. A later time after a night shift keeps the whole shift on one day. Change both in Settings.</p>
               </div>
               <div className="rounded-2xl bg-card-2 p-4 text-sm">
                 <div className="font-semibold mb-1">Your standard workout</div>

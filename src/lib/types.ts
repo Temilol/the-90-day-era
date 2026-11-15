@@ -110,7 +110,7 @@ export interface Spin { at: string; category: string; result: string }
 
 export interface EraState {
   version: number
-  profile: { name: string; startDate: string | null; units: 'lb' | 'kg'; onboarded: boolean; walkReminders?: boolean /* remind before each walk window; on unless set to false */; waterUnit?: 'oz' | 'ml'; waterGoal?: number /* ml */; waterBottle?: number /* ml */; waterNudges?: boolean /* on unless set to false */; stepGoal?: number /* 8,000 unless set */ }
+  profile: { name: string; startDate: string | null; units: 'lb' | 'kg'; onboarded: boolean; walkReminders?: boolean /* remind before each walk window; on unless set to false */; waterUnit?: 'oz' | 'ml'; waterGoal?: number /* ml */; waterBottle?: number /* ml */; waterNudges?: boolean /* on unless set to false */; stepGoal?: number /* 8,000 unless set */; dayReset?: number /* minutes after midnight when a day ends; 0 unless set */; nightReset?: number /* the same, for a day that was a night shift; follows dayReset unless set */; resetAsked?: boolean /* the reset-time question has been answered */ }
   days: Record<string, DayLog>
   xp: XpEntry[]
   purchases: Purchase[]

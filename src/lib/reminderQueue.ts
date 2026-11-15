@@ -1,7 +1,8 @@
 import type { DayLog, EraState } from './types'
-import { addDays, dayNumber, parseKey, toKey, TOTAL_DAYS } from './dates'
+import { addDays, dayNumber, parseKey, TOTAL_DAYS } from './dates'
 import { planFor, usualWalkTime, clock, toMinutes, workHours } from './walkPlan'
 import { waterSettings, fromMl } from './water'
+import { appDay, resetFor, resetTimes } from './dayReset'
 
 /** A reminder waiting to be delivered to the phone, as an exact moment in time. */
 export interface QueuedReminder { fire_at: string; title: string; body: string; url: string }
@@ -11,14 +12,15 @@ const CUSTOM_BODY = 'Incline 12 · 3 mph · 30 min. Or a shorter one, your call.
 
 /**
  * When to check on water, as [minutes after midnight, share of the goal expected by then].
- * On a work day it is a third and two thirds of the way through the shift, staying on the same
- * calendar day. Otherwise it is midday and late afternoon.
+ * On a work day it is a third and two thirds of the way through the shift, as long as that falls
+ * before the day ends (`dayEnds`, which is past 1,440 when the day runs into the next morning).
+ * Otherwise it is midday and late afternoon.
  */
-function nudgeTimes(d: DayLog | undefined): [number, number][] {
+function nudgeTimes(d: DayLog | undefined, dayEnds: number): [number, number][] {
   const work = workHours(d?.shift, d?.hours)
   if (!work) return [[12 * 60, 1 / 3], [17 * 60, 2 / 3]]
   const length = work.end > work.start ? work.end - work.start : work.end + 1440 - work.start
-  return ([[work.start + length / 3, 1 / 3], [work.start + (2 * length) / 3, 2 / 3]] as [number, number][]).filter(([m]) => m < 1440)
+  return ([[work.start + length / 3, 1 / 3], [work.start + (2 * length) / 3, 2 / 3]] as [number, number][]).filter(([m]) => m < dayEnds)
 }
 
 /**
@@ -29,7 +31,9 @@ export function buildReminderQueue(s: EraState, now: Date, daysAhead = 7): Queue
   const start = s.profile.startDate
   if (!start) return []
   const out: QueuedReminder[] = []
-  const today = toKey(now)
+  const reset = resetTimes(s.profile)
+  // Start from the day in progress, which is yesterday's date while a night shift is still running.
+  const today = appDay(now, reset, (date) => s.days[date]?.shift)
   const usualByShift = new Map<string, number | null>()
   const water = waterSettings(s.profile)
   for (let i = 0; i < daysAhead; i++) {
@@ -44,7 +48,7 @@ export function buildReminderQueue(s: EraState, now: Date, daysAhead = 7): Queue
     }
     // Hydration: two check-ins a day, each only if she is behind where the goal says she should be by then.
     if (water.nudges && !d?.quests?.hydrate) {
-      for (const [minutes, share] of nudgeTimes(d)) {
+      for (const [minutes, share] of nudgeTimes(d, 1440 + resetFor(d?.shift, reset))) {
         const target = water.goalMl * share
         if ((d?.water ?? 0) + 0.5 < target) add(minutes, 'Water check', `Aim for about ${fromMl(target, water.unit)} ${water.unit} by now. You’re at ${fromMl(d?.water ?? 0, water.unit)}.`)
       }

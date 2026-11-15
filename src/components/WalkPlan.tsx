@@ -4,26 +4,31 @@ import { clsx } from 'clsx'
 import { ArrowRight, Clock } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { addDays, todayKey } from '@/lib/dates'
+import { minutesInto } from '@/lib/dayReset'
 import { planFor, planStatus, usualWalkTime, clockRange } from '@/lib/walkPlan'
 import { earnsShiftBonus, XP } from '@/lib/xp'
 
-/** Minutes after midnight, refreshed every half minute so the countdown stays honest. */
-function useNowMinutes(): number {
-  const read = () => { const n = new Date(); return n.getHours() * 60 + n.getMinutes() }
+/**
+ * Minutes since midnight at the start of the given day, refreshed every half minute so the countdown
+ * stays honest. Goes past 1,440 when the day is still running the next morning.
+ */
+function useNowMinutes(date: string): number {
+  const read = () => minutesInto(date, new Date())
   const [now, setNow] = useState(read)
   useEffect(() => {
-    const i = setInterval(() => setNow(read()), 30_000)
-    const onVis = () => setNow(read())
-    document.addEventListener('visibilitychange', onVis)
-    return () => { clearInterval(i); document.removeEventListener('visibilitychange', onVis) }
-  }, [])
+    const tick = () => setNow(minutesInto(date, new Date()))
+    tick()
+    const i = setInterval(tick, 30_000)
+    document.addEventListener('visibilitychange', tick)
+    return () => { clearInterval(i); document.removeEventListener('visibilitychange', tick) }
+  }, [date])
   return now
 }
 
 /** The day's walk guidance, front and centre. Hidden once the walk or a rest day is logged. */
 export function WalkPlanCard({ date, setShiftHref }: { date: string; setShiftHref?: string }) {
   const days = useStore((s) => s.days)
-  const now = useNowMinutes()
+  const now = useNowMinutes(date)
   const d = days[date]
   const shift = d?.shift
   const usual = useMemo(() => (shift ? usualWalkTime(days, shift) : null), [days, shift])

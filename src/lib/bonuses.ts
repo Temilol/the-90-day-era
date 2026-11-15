@@ -1,6 +1,6 @@
 import type { DayLog, EraState, JournalEntry } from './types'
 import type { Stats } from './stats'
-import { addDays, dayNumber, toKey, weekOf, TOTAL_DAYS } from './dates'
+import { addDays, dayKeyAt, dayNumber, toKey, weekOf, TOTAL_DAYS } from './dates'
 import { BADGES } from '@/content/badges'
 
 /**
@@ -36,7 +36,7 @@ export function journalEarns(d: DayLog): boolean {
   if (!j || journalLength(j) < BONUS.journalMinChars) return false
   const at = new Date(j.qualifiedAt ?? j.updatedAt)
   if (isNaN(at.getTime())) return false
-  return toKey(at) <= addDays(d.date, 1)
+  return dayKeyAt(at) <= addDays(d.date, 1)
 }
 
 export function expectedBonuses(s: EraState, stats: Stats): Bonus[] {
