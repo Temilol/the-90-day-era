@@ -1077,3 +1077,14 @@ describe('day reset times', () => {
     expect(nudges(state(420), at(3, 1))).toEqual(['1/3 2:00']) // built from Friday even though the calendar says Saturday
   })
 })
+
+describe('balance after a spent bonus is removed', () => {
+  it('never shows below zero, and says how much has to be earned back', () => {
+    const base = initialState()
+    const state = { ...base, profile: { ...base.profile, startDate: '2026-01-01', onboarded: true }, xp: [{ id: 'workout:2026-01-01', amount: 25, reason: 'Walk', date: '2026-01-01', at: 'x' }], purchases: [{ id: 'p1', rewardId: 'r', name: 'Treat', cost: 40, at: 'x' }] }
+    const owing = computeStats(state, '2026-01-02')
+    expect([owing.spendableXp, owing.balanceXp, owing.owedXp]).toEqual([-15, 0, 15])
+    const fine = computeStats({ ...state, purchases: [] }, '2026-01-02')
+    expect([fine.spendableXp, fine.balanceXp, fine.owedXp]).toEqual([25, 25, 0])
+  })
+})

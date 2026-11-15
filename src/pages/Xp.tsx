@@ -5,6 +5,7 @@ import { formatDate } from '@/lib/dates'
 import { PageHeader, Card, Progress, Ring, SectionTitle, Empty } from '@/components/ui'
 import { clsx } from 'clsx'
 import { BONUS } from '@/lib/bonuses'
+import { OwedNote } from '@/components/OwedNote'
 
 export default function XpPage() {
   const stats = useStats()
@@ -23,9 +24,10 @@ export default function XpPage() {
         </Ring>
         <div className="flex-1 w-full">
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-card-2 p-3"><div className="text-xs text-muted">Spendable</div><div className="h-display text-2xl">{stats.spendableXp} XP</div></div>
+            <div className="rounded-2xl bg-card-2 p-3"><div className="text-xs text-muted">Spendable</div><div className="h-display text-2xl">{stats.balanceXp} XP</div></div>
             <div className="rounded-2xl bg-card-2 p-3"><div className="text-xs text-muted">Lifetime</div><div className="h-display text-2xl">{stats.lifetimeXp} XP</div></div>
           </div>
+          <OwedNote owed={stats.owedXp} />
           <div className="mt-3 text-sm text-muted">{stats.level.next ? <>{stats.level.toNext} XP to <span className="font-semibold text-ink">Level {stats.level.next.level}: {stats.level.next.title}</span></> : 'Max level reached. Legendary.'}</div>
           <Progress value={stats.level.progress} className="mt-2" />
         </div>

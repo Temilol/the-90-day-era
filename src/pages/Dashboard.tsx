@@ -99,7 +99,7 @@ export default function Dashboard() {
         <Card className="!p-4"><div className="text-xs font-semibold uppercase tracking-wider text-muted">Progress</div><div className="h-display text-2xl mt-1">{Math.round((stats.displayDay / TOTAL_DAYS) * 100)}%</div><Progress value={stats.displayDay / TOTAL_DAYS} className="mt-2" height="h-1.5" /></Card>
         <Card className="!p-4"><div className="text-xs font-semibold uppercase tracking-wider text-muted">Active days</div><div className="h-display text-2xl mt-1">{stats.daysLogged}</div><div className="text-xs text-muted">{stats.daysRemaining} days remaining</div></Card>
         <Card className="!p-4"><div className="text-xs font-semibold uppercase tracking-wider text-muted flex items-center gap-1"><Flame size={12} className="text-blush-500" />Streak</div><div className="h-display text-2xl mt-1">{stats.streak}</div><div className="text-xs text-muted">best {stats.bestStreak} · {stats.freezesLeft} 🧊 left</div></Card>
-        <Card className="!p-4"><div className="text-xs font-semibold uppercase tracking-wider text-muted flex items-center gap-1"><SparkIcon size={12} className="text-lavender-500" />XP</div><div className="h-display text-2xl mt-1">{stats.spendableXp}</div><div className="text-xs text-muted">{stats.lifetimeXp} lifetime</div></Card>
+        <Card className="!p-4"><div className="text-xs font-semibold uppercase tracking-wider text-muted flex items-center gap-1"><SparkIcon size={12} className="text-lavender-500" />XP</div><div className="h-display text-2xl mt-1">{stats.balanceXp}</div><div className="text-xs text-muted">{stats.lifetimeXp} lifetime</div></Card>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">

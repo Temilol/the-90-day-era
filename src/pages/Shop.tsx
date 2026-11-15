@@ -11,6 +11,7 @@ import { Pencil, Plus, Trash2, ImagePlus, ExternalLink, X } from 'lucide-react'
 import { XP } from '@/lib/xp'
 import { useRef } from 'react'
 import type { Reward } from '@/lib/types'
+import { OwedNote } from '@/components/OwedNote'
 
 export default function Shop() {
   const stats = useStats()
@@ -56,7 +57,7 @@ export default function Shop() {
       <PageHeader title="Reward Shop" emoji="🛍️" sub="Spend XP on real-life treats. Add a photo or link so you can see what you’re walking toward." action={<button className="btn-soft" onClick={() => setEdit({ emoji: '🎁', cost: 150 })}><Plus size={16} /> Add</button>} />
       <Card className="flex items-center gap-4 bg-gradient-to-br from-lavender-50 to-blush-50 dark:from-lavender-500/15 dark:to-blush-500/10">
         <div className="text-4xl">💎</div>
-        <div className="flex-1"><div className="text-xs font-bold uppercase tracking-wider text-muted">Balance</div><div className="h-display text-3xl gradient-text">{stats.spendableXp} XP</div><div className="text-xs text-muted">{stats.spentXp} spent · {stats.lifetimeXp} earned</div></div>
+        <div className="flex-1 min-w-0"><div className="text-xs font-bold uppercase tracking-wider text-muted">Balance</div><div className="h-display text-3xl gradient-text">{stats.balanceXp} XP</div><div className="text-xs text-muted">{stats.spentXp} spent · {stats.lifetimeXp} earned</div><OwedNote owed={stats.owedXp} /></div>
       </Card>
 
       <div className="grid sm:grid-cols-2 gap-3">
@@ -73,7 +74,7 @@ export default function Shop() {
                 <div className="text-xs text-muted">{r.cost} XP{r.budget ? ` · up to $${r.budget}` : ''}{owned ? ` · unlocked ×${owned}` : ''}{!can && ` · about ${walksAway(r.cost - stats.spendableXp)} more walk${walksAway(r.cost - stats.spendableXp) === 1 ? '' : 's'}`}</div>
                 {r.note && <div className="text-xs text-muted italic truncate mt-0.5">{r.note}</div>}
                 {r.link && <a href={r.link} target="_blank" rel="noreferrer" className="text-xs text-lavender-600 dark:text-lavender-300 font-medium inline-flex items-center gap-1 mt-0.5"><ExternalLink size={11} /> Open link</a>}
-                {!can && <Progress value={stats.spendableXp / r.cost} className="mt-2" height="h-1.5" />}
+                {!can && <Progress value={stats.balanceXp / r.cost} className="mt-2" height="h-1.5" />}
               </div>
               <div className="flex flex-col items-end gap-1">
                 <button className={can ? 'btn-primary !py-1.5' : 'btn-soft !py-1.5'} disabled={!can} onClick={() => { setCouponId(stats.spendableXp >= r.cost ? null : coupons.find((c) => stats.spendableXp >= priceOf(r, c.pct))?.id ?? null); setConfirmBuy(r) }}>{can ? 'Unlock' : `${r.cost - stats.spendableXp} XP to go`}</button>

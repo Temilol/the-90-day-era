@@ -64,7 +64,7 @@ export function Layout() {
           <div className="size-10 rounded-full bg-gradient-to-br from-lavender-400 to-blush-400 grid place-items-center text-white font-bold">{(name || 'E')[0].toUpperCase()}</div>
           <div className="min-w-0">
             <div className="font-semibold truncate">{name || 'Era Explorer'}</div>
-            <div className="text-xs text-muted">Lv {stats.level.level} {stats.level.title} · {stats.spendableXp} XP</div>
+            <div className="text-xs text-muted">Lv {stats.level.level} {stats.level.title} · {stats.balanceXp} XP</div>
           </div>
         </div>
         {NAV.map((n) => (

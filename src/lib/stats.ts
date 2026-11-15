@@ -29,7 +29,9 @@ export interface Stats {
   bestStreak: number
   lifetimeXp: number
   spentXp: number
-  spendableXp: number
+  spendableXp: number // earned minus spent; below zero when a bonus that was already spent has been removed
+  balanceXp: number // what to show: never below zero
+  owedXp: number // how much has to be earned back before the balance rises again
   level: ReturnType<typeof levelFor>
   questsCompleted: number
   questCounts: Record<string, number>
@@ -222,7 +224,7 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
     chapter: chapterOf(displayDay), week: weekOf(displayDay),
     daysLogged, daysRemaining: Math.max(0, TOTAL_DAYS - Math.min(currentDay, TOTAL_DAYS)),
     workouts, fullWorkouts, walkingMinutes, strengthSessions, strengthMinutes, recoveryDays,
-    streak, bestStreak, lifetimeXp, spentXp, spendableXp, level: levelFor(lifetimeXp),
+    streak, bestStreak, lifetimeXp, spentXp, spendableXp, balanceXp: Math.max(0, spendableXp), owedXp: Math.max(0, -spendableXp), level: levelFor(lifetimeXp),
     questsCompleted, questCounts, selfCareQuests, journalEntries, nightShiftWorkouts, dayShiftWorkouts, byShift, calories, otherActivities, water, steps,
     bossesDefeated, reflections, purchases: s.purchases.length, spins: s.spins.length, envelopesOpened,
     comebacks, themesUsed, bonusMissions, weekly, nsvs: s.nsvs.length, weights: s.weights.length, activeDates, frozenDates, freezesLeft, freezesLeftByChapter, bonusFreezes, secrets,
