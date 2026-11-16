@@ -43,6 +43,7 @@ export default function App() {
         <Route path="journal" element={<Journal />} />
         <Route path="shifts" element={<Shifts />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="settings/:section" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

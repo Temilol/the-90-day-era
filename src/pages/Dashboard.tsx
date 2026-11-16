@@ -251,7 +251,7 @@ function PreStart() {
         <ul className="text-sm text-muted space-y-1.5 list-disc pl-5">
           <li>Set up your <Link to="/shop" className="text-lavender-600 dark:text-lavender-300 font-medium">reward shop</Link> with prizes you actually want.</li>
           <li>Log your upcoming shifts in the <Link to="/shifts" className="text-lavender-600 dark:text-lavender-300 font-medium">shift tracker</Link> so reminders know when to nudge you.</li>
-          <li>Change the start date any time in <Link to="/settings" className="text-lavender-600 dark:text-lavender-300 font-medium">Settings</Link>.</li>
+          <li>Change the start date any time in <Link to="/settings/account" className="text-lavender-600 dark:text-lavender-300 font-medium">Settings</Link>.</li>
         </ul>
       </Card>
     </div>
