@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { clsx } from 'clsx'
-import { motion } from 'framer-motion'
 import { useStore } from '@/store/useStore'
 import { questsFor, themeFor } from '@/lib/hooks'
 import { walkXp, XP, earnsShiftBonus, ACTIVITY_MIN_MINUTES, stepGoalOf } from '@/lib/xp'
@@ -11,9 +10,10 @@ import { Check, Modal, Progress } from './ui'
 import { waterSettings, fromMl, toMl, goalMet } from '@/lib/water'
 import { burst, hearts } from './Celebrate'
 import { tap } from '@/lib/haptics'
-import { Shuffle, Trash2, Flame, Plus, X, Repeat, Footprints } from 'lucide-react'
+import { Shuffle, Trash2, Pencil, Flame, Plus, X, Repeat, Footprints } from 'lucide-react'
 import { readyPrizes } from '@/lib/prizes'
 import { todayKey, toKey, addDays, dayNumber } from '@/lib/dates'
+import { WalkPlanPanel } from './WalkPlan'
 
 export const SHIFTS: { id: ShiftType; label: string; short: string; emoji: string; sub: string }[] = [
   { id: 'day', label: 'Day shift', short: 'Day', emoji: '🌤️', sub: '6 AM – 6 PM' },
@@ -73,7 +73,7 @@ function WalkCalories({ date, locked }: { date: string; locked?: boolean }) {
   return (
     <form className="flex items-center gap-2 rounded-2xl bg-card-2 p-2.5" onSubmit={(e) => { e.preventDefault(); setCalories(date, value.trim() ? parseFloat(value) : undefined); setEditing(false); setValue('') }}>
       <Flame size={18} className="text-peach-400 shrink-0 ml-1" />
-      <input type="number" inputMode="numeric" min={1} max={5000} className="input !py-2 flex-1 min-w-0" placeholder="Calories burned (optional)" aria-label="Calories burned on this walk" value={value} onChange={(e) => setValue(e.target.value)} />
+      <input type="number" inputMode="numeric" min={1} max={5000} className="input !py-2 flex-1 min-w-0" placeholder="Calories" aria-label="Calories burned on this walk, optional" value={value} onChange={(e) => setValue(e.target.value)} />
       <button className="btn-soft !py-2 shrink-0" type="submit" disabled={!editing && !value.trim()}>Save</button>
     </form>
   )
@@ -220,48 +220,59 @@ export function WorkoutCard({ date, locked }: { date: string; locked?: boolean }
 
   return (
     <div className="card overflow-hidden">
-      <div className={clsx('p-5 relative', done ? 'bg-gradient-to-br from-lavender-500 via-lavender-500 to-blush-400 text-white' : 'bg-gradient-to-br from-lavender-50 to-blush-50 dark:from-lavender-500/15 dark:to-blush-500/10')}>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className={clsx('text-xs font-bold uppercase tracking-[0.2em]', done ? 'text-white/80' : 'text-lavender-500')}>{done ? 'Workout complete' : date === todayKey() ? 'Today’s workout' : 'The walk'}</div>
-            <div className="h-display text-2xl mt-1">{done ? `${d!.workout!.minutes} min logged` : 'The Standard'}</div>
-            <div className={clsx('text-sm mt-1', done ? 'text-white/85' : 'text-muted')}>
-              {done ? `Incline ${d!.workout!.incline} · ${d!.workout!.speed} mph · +${walkEarned} XP${bonusEarned ? ` walk, +${bonusEarned} shift bonus` : ''}${doubleEarned ? `, +${doubleEarned} double XP` : ''}` : 'Incline 12 · 3.0 mph · 30 minutes'}
-            </div>
-            {!done && (bonusDay || doubleOn) && <div className="mt-2 flex flex-wrap gap-1.5">{bonusDay && <span className="chip bg-lavender-500 text-white">🛡️ Shift day: +{XP.shiftBonus} bonus XP</span>}{doubleOn && <span className="chip bg-blush-500 text-white">⚡ Double XP is on</span>}</div>}
+      {done ? (
+        // A finished walk shrinks to one row, in the same place.
+        <div className="px-4 py-3 flex items-center gap-2.5 bg-gradient-to-br from-lavender-500 via-lavender-500 to-blush-400 text-white">
+          <span className="grid place-items-center size-5 rounded-full shrink-0 bg-white/25 text-[11px] font-bold" aria-hidden>✓</span>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold">Walk done · {d!.workout!.minutes} min</div>
+            <div className="text-xs text-white/85">+{walkEarned} XP{bonusEarned ? ` · +${bonusEarned} shift bonus` : ''}{doubleEarned ? ` · +${doubleEarned} double XP` : ''}</div>
           </div>
-          <motion.div animate={done ? { rotate: [0, -10, 10, 0] } : {}} className="text-4xl">{done ? '🏆' : '🚶‍♀️'}</motion.div>
+          {!locked && (
+            <div className="flex items-center gap-1 shrink-0">
+              <button className="rounded-full bg-white/20 hover:bg-white/30 p-2" aria-label="Edit this walk" onClick={() => { setMinutes(d!.workout!.minutes); setIncline(d!.workout!.incline); setSpeed(d!.workout!.speed); setNotes(d!.workout!.notes || ''); setCustom(true) }}><Pencil size={14} /></button>
+              <button className="rounded-full bg-white/20 hover:bg-white/30 p-2" aria-label="Remove this walk" onClick={() => { if (confirm('Remove this workout log? Its XP will be removed too.')) removeWorkout(date) }}><Trash2 size={14} /></button>
+            </div>
+          )}
         </div>
+      ) : (
+        <div className="p-5 relative bg-gradient-to-br from-lavender-50 to-blush-50 dark:from-lavender-500/15 dark:to-blush-500/10">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[0.2em] text-lavender-500">{date === todayKey() ? 'Today’s workout' : 'The walk'}</div>
+              <div className="h-display text-2xl mt-1">The Standard</div>
+              <div className="text-sm mt-1 text-muted">Incline 12 · 3.0 mph · 30 minutes</div>
+              {(bonusDay || doubleOn) && <div className="mt-2 flex flex-wrap gap-1.5">{bonusDay && <span className="chip bg-lavender-500 text-white">🛡️ Shift day: +{XP.shiftBonus} bonus XP</span>}{doubleOn && <span className="chip bg-blush-500 text-white">⚡ Double XP is on</span>}</div>}
+            </div>
+            <div className="text-4xl">🚶‍♀️</div>
+          </div>
+          {/* When to walk today, worked out from the shift. Gone once a rest day is logged. */}
+          {date === todayKey() && !d?.recovery && <WalkPlanPanel date={date} />}
         {!done && !locked && lateNight && (
           <button onClick={() => setToYesterday(!toYesterday)} className={clsx('mt-4 w-full rounded-2xl border p-3 text-left text-sm flex items-center gap-3 transition', toYesterday ? 'border-lavender-400 bg-white/70 dark:bg-white/10' : 'border-line bg-white/40 dark:bg-white/5')}>
             <span className={clsx('size-5 rounded-full grid place-items-center text-xs shrink-0', toYesterday ? 'bg-lavender-500 text-white' : 'border border-line bg-white dark:bg-white/10')}>{toYesterday ? '✓' : ''}</span>
             <span><span className="font-semibold">Post-shift walk? Count it toward yesterday</span><span className="block text-xs text-muted">It’s before 6 AM. Day {dayNumber(startDate!, yesterdayKey)} hasn’t got a walk yet.</span></span>
           </button>
         )}
-        {!done && !locked && (
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <button className="btn-primary py-3" onClick={() => complete(30, 12, 3)}>Complete standard walk</button>
-            <button className="btn bg-white/80 dark:bg-white/10 text-ink py-3" onClick={() => setCustom(true)}>Log a modified walk</button>
-          </div>
-        )}
-        {done && !locked && (
-          <div className="mt-4 flex gap-2 flex-wrap">
-            <button className="btn bg-white/20 text-white hover:bg-white/30" onClick={() => { setMinutes(d!.workout!.minutes); setIncline(d!.workout!.incline); setSpeed(d!.workout!.speed); setNotes(d!.workout!.notes || ''); setCustom(true) }}>Edit</button>
-            <button className="btn bg-white/20 text-white hover:bg-white/30" onClick={() => { if (confirm('Remove this workout log? Its XP will be removed too.')) removeWorkout(date) }}><Trash2 size={14} /> Remove</button>
-          </div>
-        )}
-      </div>
+          {!locked && (
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button className="btn-primary py-3" onClick={() => complete(30, 12, 3)}>Complete standard walk</button>
+              <button className="btn bg-white/80 dark:bg-white/10 text-ink py-3" onClick={() => setCustom(true)}>Log a modified walk</button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="p-5 space-y-4">
-        <div className="flex items-center gap-3 rounded-2xl bg-card-2 p-3">
+        {!done && <div className="flex items-center gap-3 rounded-2xl bg-card-2 p-3">
           <div className="text-2xl">{theme.emoji}</div>
           <div className="flex-1 min-w-0">
             <div className="text-xs font-semibold uppercase tracking-wider text-muted">Entertainment theme</div>
             <div className="font-semibold">{theme.name}</div>
             <div className="text-xs text-muted">{theme.blurb}</div>
           </div>
-          {!done && !locked && <button onClick={reroll} className="btn-ghost p-2" title="Shuffle theme"><Shuffle size={16} /></button>}
-        </div>
+          {!locked && <button onClick={reroll} className="btn-ghost p-2" title="Shuffle theme"><Shuffle size={16} /></button>}
+        </div>}
 
         {!done && (
           <div className="grid grid-cols-2 gap-2">
@@ -338,6 +349,7 @@ function HydrationCard({ date, locked, hint }: { date: string; locked?: boolean;
   const undoWater = useStore((s) => s.undoWater)
   const [custom, setCustom] = useState(false)
   const [amount, setAmount] = useState('')
+  const [more, setMore] = useState(false) // goal reached, but she wants to keep logging
   const ws = waterSettings(profile)
   const have = fromMl(water ?? 0, ws.unit)
   const goal = fromMl(ws.goalMl, ws.unit)
@@ -350,6 +362,17 @@ function HydrationCard({ date, locked, hint }: { date: string; locked?: boolean;
     if (reaches) burst()
   }
   const status = tickedByHand ? 'Ticked off before water logging' : done ? `${have} of ${goal} ${ws.unit}. Goal reached` : `${have} of ${goal} ${ws.unit}`
+  // Once the goal is reached the card shrinks to one row where it is; "Log more" opens it again.
+  if (done && !more) {
+    return (
+      <div className="flex items-center gap-3 rounded-2xl border px-3 py-2 border-lavender-300 bg-lavender-50 dark:bg-lavender-500/15 dark:border-lavender-500/40">
+        <span className="grid place-items-center size-5 rounded-full shrink-0 text-[11px] font-bold bg-gradient-to-br from-lavender-500 to-blush-400 text-white shadow-glow" aria-hidden>✓</span>
+        <span className="text-base shrink-0">💧</span>
+        <span className="flex-1 min-w-0 text-sm text-muted" role="status"><span className="font-medium">Hydration</span> · {tickedByHand ? 'ticked off' : `${have} of ${goal} ${ws.unit}`}</span>
+        {!locked && !tickedByHand && <button type="button" className="text-xs font-semibold underline text-lavender-600 dark:text-lavender-300 shrink-0 whitespace-nowrap" onClick={() => setMore(true)}>Log more</button>}
+      </div>
+    )
+  }
   return (
     <div className={clsx('rounded-2xl border p-3 transition', done ? 'border-lavender-300 bg-lavender-50 dark:bg-lavender-500/15 dark:border-lavender-500/40' : 'border-line bg-card-2')}>
       <div className="flex items-center gap-3">
@@ -407,13 +430,13 @@ export function QuestList({ date, locked }: { date: string; locked?: boolean }) 
       {quests.map((q) => (
         q.id === 'hydrate' ? <HydrationCard key={q.id} date={date} locked={locked} hint={q.hint} /> :
         <div key={q.id} className={clsx('relative', canSwap && q.id !== 'hydrate' && !d?.quests?.[q.id] && '[&>button:first-child]:pr-11')}>
-          <Check disabled={locked} checked={!!d?.quests?.[q.id]} onChange={() => { toggleQuest(date, q.id); tap(); if (!d?.quests?.[q.id] && doneCount + 1 === quests.length) burst() }} label={q.title} sub={q.hint} emoji={q.emoji} />
+          <Check disabled={locked} checked={!!d?.quests?.[q.id]} onChange={() => { toggleQuest(date, q.id); tap(); if (!d?.quests?.[q.id] && doneCount + 1 === quests.length) burst() }} label={q.title} sub={q.hint} emoji={q.emoji} shrinkWhenDone />
           {canSwap && q.id !== 'hydrate' && !d?.quests?.[q.id] && <button onClick={() => { if (swapQuest(date, q.id)) hearts() }} className="absolute right-2 top-2 btn-ghost p-1.5" aria-label={`Swap “${q.title}” for a different quest`}><Repeat size={14} /></button>}
         </div>
       ))}
       {d?.bonusMission && (
         <div className={clsx('relative', !d.bonusMission.done && !locked && '[&>button:first-child]:pr-14')}>
-          <Check disabled={locked || !!d.bonusMission.done} checked={!!d.bonusMission.done} onChange={() => { completeBonus(date); hearts() }} label={d.bonusMission.text} sub={`Bonus mission · ${d.bonusMission.source} · +${XP.bonusMission} XP`} emoji="🎡" />
+          <Check disabled={locked || !!d.bonusMission.done} checked={!!d.bonusMission.done} onChange={() => { completeBonus(date); hearts() }} label={d.bonusMission.text} sub={`Bonus mission · ${d.bonusMission.source} · +${XP.bonusMission} XP`} emoji="🎡" shrinkWhenDone />
           {!d.bonusMission.done && !locked && <button onClick={() => clearBonus(date)} className="absolute right-2 top-2 btn-ghost p-1.5 text-xs">Skip</button>}
         </div>
       )}

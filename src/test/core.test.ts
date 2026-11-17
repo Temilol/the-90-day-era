@@ -1088,3 +1088,34 @@ describe('balance after a spent bonus is removed', () => {
     expect([fine.spendableXp, fine.balanceXp, fine.owedXp]).toEqual([25, 25, 0])
   })
 })
+
+describe('journal quest ticks itself', () => {
+  it('ticks once when the entry first has real writing, and can still be changed by hand', async () => {
+    const { questsFor } = await import('@/lib/quests')
+    const base = initialState()
+    // find a day whose quests include the journal one
+    let date = ''
+    for (let i = 0; i < 200 && !date; i++) { const k = addDays('2026-01-01', i); if (questsFor(k).some((q) => q.id === 'journal')) date = k }
+    expect(date).not.toBe('')
+    const other = addDays(date, 1 + [...Array(50).keys()].find((i) => !questsFor(addDays(date, 1 + i)).some((q) => q.id === 'journal'))!)
+    useStore.setState({ ...base, profile: { ...base.profile, name: 'T', startDate: '2025-12-01', onboarded: true } })
+    const st = () => useStore.getState()
+    const questXp = (d: string) => st().xp.find((e) => e.id === `quest:${d}:journal`)?.amount ?? 0
+    if (date > todayKeyForTest() || other > todayKeyForTest()) return // only meaningful for days that have happened
+    st().saveJournal(date, { mood: 'good' })
+    expect(st().days[date].quests.journal).toBeUndefined() // a mood tap is not writing
+    st().saveJournal(date, { reflection: 'A long enough line about today.' })
+    expect(st().days[date].quests.journal).toBeTruthy()
+    expect(questXp(date)).toBe(5)
+    st().toggleQuest(date, 'journal') // untick by hand
+    expect(st().days[date].quests.journal).toBeUndefined()
+    st().saveJournal(date, { reflection: 'A long enough line about today, edited.' })
+    expect(st().days[date].quests.journal).toBeUndefined() // editing does not tick it again
+    st().toggleQuest(date, 'journal') // and it can be ticked by hand
+    expect(questXp(date)).toBe(5)
+    // on a day without the journal quest, writing ticks nothing
+    st().saveJournal(other, { reflection: 'A long enough line about another day.' })
+    expect(st().days[other].quests.journal).toBeUndefined()
+    useStore.setState(initialState())
+  })
+})

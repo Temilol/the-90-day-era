@@ -98,20 +98,21 @@ export function Modal({ open, onClose, children, title, wide }: { open: boolean;
   )
 }
 
-export function Check({ checked, onChange, label, sub, emoji, disabled }: { checked: boolean; onChange: () => void; label: string; sub?: string; emoji?: string; disabled?: boolean }) {
+export function Check({ checked, onChange, label, sub, emoji, disabled, shrinkWhenDone }: { checked: boolean; onChange: () => void; label: string; sub?: string; emoji?: string; disabled?: boolean; shrinkWhenDone?: boolean }) {
+  const small = !!shrinkWhenDone && checked // a finished item stays in place but takes less room
   return (
     <button type="button" disabled={disabled} onClick={onChange}
-      className={clsx('w-full flex items-center gap-3 rounded-2xl border p-3 text-left transition active:scale-[0.99] disabled:opacity-50',
+      className={clsx('w-full flex items-center gap-3 rounded-2xl border text-left transition active:scale-[0.99] disabled:opacity-50', small ? 'px-3 py-2' : 'p-3',
         checked ? 'border-lavender-300 bg-lavender-50 dark:bg-lavender-500/15 dark:border-lavender-500/40' : 'border-line bg-card-2 hover:border-lavender-200')}>
       <motion.span animate={checked ? { scale: [1, 1.25, 1] } : { scale: 1 }} transition={{ duration: 0.35 }}
-        className={clsx('grid place-items-center size-7 rounded-full shrink-0 text-sm font-bold transition',
+        className={clsx('grid place-items-center rounded-full shrink-0 font-bold transition', small ? 'size-5 text-[11px]' : 'size-7 text-sm',
           checked ? 'bg-gradient-to-br from-lavender-500 to-blush-400 text-white shadow-glow' : 'bg-white dark:bg-white/10 border border-line')}>
         {checked ? '✓' : ''}
       </motion.span>
-      {emoji && <span className="text-xl">{emoji}</span>}
+      {emoji && <span className={small ? 'text-base' : 'text-xl'}>{emoji}</span>}
       <span className="flex-1 min-w-0">
-        <span className={clsx('block font-medium', checked && 'line-through text-muted')}>{label}</span>
-        {sub && <span className="block text-xs text-muted break-words">{sub}</span>}
+        <span className={clsx('block font-medium', small && 'text-sm', checked && 'line-through text-muted')}>{label}</span>
+        {sub && !small && <span className="block text-xs text-muted break-words">{sub}</span>}
       </span>
     </button>
   )

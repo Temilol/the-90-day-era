@@ -5,7 +5,8 @@ import type { DayLog, EraState, JournalEntry, Reminder, Reward, ShiftHours, Shif
 import { DEFAULT_ELECTIVE } from '@/lib/walkPlan'
 import { planFill, type FillOptions } from '@/lib/schedule'
 import { waterSettings, goalMet } from '@/lib/water'
-import { todayKey, dayNumber, TOTAL_DAYS, weekOf, chapterOf, setDayResolver } from '@/lib/dates'
+import { todayKey, addDays, dayNumber, TOTAL_DAYS, weekOf, chapterOf, setDayResolver } from '@/lib/dates'
+import { questsFor } from '@/lib/quests'
 import { appDay, resetTimes } from '@/lib/dayReset'
 import { XP, walkXp, walkKind, levelFor, earnsShiftBonus, ACTIVITY_MIN_MINUTES, LEVEL_EMOJI } from '@/lib/xp'
 import { computeStats } from '@/lib/stats'
@@ -381,6 +382,13 @@ export const useStore = create<Store>()(
           d.journal = { ...(d.journal || { updatedAt: '' }), ...entry, updatedAt: now }
           // Remember when the entry first had real writing in it; journal XP depends on that being timely.
           if (!d.journal.qualifiedAt && journalLength(d.journal) >= BONUS.journalMinChars) d.journal.qualifiedAt = hadEnough && previous ? previous : now
+          // The first time an entry has real writing in it, the journal quest ticks itself if it is one of that day's quests.
+          // It can still be ticked or unticked by hand.
+          if (!hadEnough && journalLength(d.journal) >= BONUS.journalMinChars && !d.quests.journal && inChallenge(s, date)
+            && questsFor(date, d.shift, d.quests, d.swaps, s.days[addDays(date, 1)]?.shift).some((q) => q.id === 'journal')) {
+            d.quests.journal = now
+            if (award(s, `quest:${date}:journal`, XP.quest, 'Daily quest', date)) toast(`+${XP.quest} XP`, 'Journal quest complete')
+          }
         }),
 
         toggleBossTask: (bossId, taskId) => set((s) => {
