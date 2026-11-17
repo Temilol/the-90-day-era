@@ -83,7 +83,7 @@ export function PhotoCompare({ open, onClose }: { open: boolean; onClose: () => 
   const side = (p: ProgressPhoto, c: ReturnType<typeof caption>, key: 'a' | 'b') => (
     <div className="min-w-0">
       <select className="input py-2 text-sm" value={p.id} onChange={(e) => setPick((s) => ({ ...s, [key]: e.target.value }))} aria-label={key === 'a' ? 'First photo' : 'Second photo'}>
-        {photos.map((x) => { const cx = caption(x.date); return <option key={x.id} value={x.id}>{cx.day ? `${cx.day} · ` : ''}{formatDate(x.date, { month: 'short', day: 'numeric' })}</option> })}
+        {photos.map((x) => <option key={x.id} value={x.id}>{formatDate(x.date, { month: 'short', day: 'numeric' })}</option>)}
       </select>
       <PhotoImg id={p.id} className="w-full aspect-[3/4] rounded-2xl mt-2" />
       <div className="text-center text-xs text-muted mt-1.5">{c.day ?? c.date}{c.weight ? ` · ${c.weight}` : ''}</div>

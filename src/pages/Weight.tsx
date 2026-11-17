@@ -115,7 +115,7 @@ export default function Weight() {
             {NSV_CATS.map(([e, c]) => <button key={c} onClick={() => setCat(c)} className={clsx('chip shrink-0 py-1.5', cat === c ? 'bg-lavender-500 text-white' : 'bg-card-2 text-muted')}>{e} {c}</button>)}
           </div>
           <form className="flex gap-2 mt-2" onSubmit={(e) => { e.preventDefault(); if (text.trim()) { addNsv(cat, text.trim()); setText(''); hearts() } }}>
-            <input className="input" placeholder="Took the stairs without stopping…" value={text} onChange={(e) => setText(e.target.value)} />
+            <input className="input" placeholder="A win today…" aria-label="Describe a non-scale victory" value={text} onChange={(e) => setText(e.target.value)} />
             <button className="btn-primary" type="submit">Add</button>
           </form>
           <div className="mt-4 space-y-2">
