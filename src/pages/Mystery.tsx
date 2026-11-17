@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStore } from '@/store/useStore'
@@ -11,8 +12,24 @@ import { hearts } from '@/components/Celebrate'
 import { XP } from '@/lib/xp'
 import { addDays, dayNumber, TOTAL_DAYS } from '@/lib/dates'
 
+type Tab = 'envelopes' | 'wheel' | 'themes'
+const TABS: { id: Tab; label: string }[] = [{ id: 'envelopes', label: 'Envelopes' }, { id: 'wheel', label: 'Wheel' }, { id: 'themes', label: 'Themes' }]
+const LAST_TAB = 'era-mystery-tab'
+const lastTab = (): Tab => { try { const v = localStorage.getItem(LAST_TAB); return v === 'wheel' || v === 'themes' ? v : 'envelopes' } catch { return 'envelopes' } }
+
 export default function Mystery() {
   const stats = useStats()
+  // The tab comes from the link (/mystery#wheel).
+  const loc = useLocation()
+  const hash = loc.hash.slice(1)
+  const unopened = useStore((s) => Object.values(s.envelopes).filter((e) => !e.openedAt).length)
+  // With no tab in the link: an envelope waiting to be opened wins, otherwise the tab she used last.
+  // Decided once per arrival, so opening that envelope does not move her to another tab.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const arrival = useMemo<Tab>(() => (Object.values(useStore.getState().envelopes).some((e) => !e.openedAt) ? 'envelopes' : lastTab()), [loc.key])
+  const tab: Tab = hash === 'wheel' || hash === 'themes' ? hash : hash === 'envelopes' || hash === 'capsule' ? 'envelopes' : arrival
+  // Only a tab she chose herself is remembered, not one the page picked for her.
+  useEffect(() => { if (hash) try { localStorage.setItem(LAST_TAB, tab) } catch { /* private mode */ } }, [tab, hash])
   const recordSpin = useStore((s) => s.recordSpin)
   const setBonus = useStore((s) => s.setBonusMission)
   const todayLog = useStore((s) => s.days[stats.today])
@@ -56,11 +73,23 @@ export default function Mystery() {
     <div className="space-y-8">
       <PageHeader title="Mystery Missions" emoji="🎁" sub="Envelopes unlock at milestones. Pick one of three rewards and keep it. The wheel is always open." />
 
-      <EnvelopeGrid />
-      <MyRewards />
-      <TimeCapsule />
+      <div role="tablist" aria-label="Mystery Missions sections" className="grid grid-cols-3 gap-1 rounded-full bg-card-2 p-1 text-sm font-semibold -mt-2">
+        {TABS.map((x) => (
+          <Link key={x.id} to={`#${x.id}`} replace role="tab" aria-selected={tab === x.id} className={clsx('relative rounded-full py-2 text-center transition', tab === x.id ? 'bg-card shadow-soft text-ink' : 'text-muted')}>
+            {x.label}
+            {x.id === 'envelopes' && unopened > 0 && <span className="absolute top-1.5 right-2.5 size-2 rounded-full bg-blush-500" aria-label={`${unopened} ready to open`} />}
+          </Link>
+        ))}
+      </div>
 
-      <section id="wheel" className="scroll-mt-4">
+      {/* Every tab stays mounted, so a spin result is still there after a look at another tab. */}
+      <div hidden={tab !== 'envelopes'} className="space-y-8">
+        <EnvelopeGrid />
+        <MyRewards />
+        <TimeCapsule />
+      </div>
+
+      <section hidden={tab !== 'wheel'}>
         <SectionTitle sub="Pick a category and spin. One result a day can become your bonus mission for +10 XP.">Spin the wheel</SectionTitle>
         <Card>
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
@@ -98,7 +127,7 @@ export default function Mystery() {
         </Card>
       </section>
 
-      <section>
+      <section hidden={tab !== 'themes'}>
         <SectionTitle sub="Same incline, same speed, different vibe. Today’s theme is on your mission page; here’s the whole deck.">Entertainment themes</SectionTitle>
         <div className="grid sm:grid-cols-2 gap-2">
           {THEMES.map((t) => <div key={t.id} className="card p-3 flex gap-3 items-start"><span className="text-2xl">{t.emoji}</span><div><div className="font-semibold text-sm">{t.name}</div><div className="text-xs text-muted">{t.blurb}</div></div></div>)}

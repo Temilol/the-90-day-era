@@ -131,7 +131,7 @@ export default function Dashboard() {
           {bp.complete && !bossDone ? <button onClick={(e) => { e.preventDefault(); claimBoss(boss.id); burst({ big: true }) }} className="btn-primary !py-1.5 text-xs shrink-0">Claim</button> : <Swords size={18} className="text-lavender-400 shrink-0" />}
         </Link>
         {stats.started && (unopened > 0 || upcoming) && (
-          <Link to="/mystery" className="flex items-center gap-3 px-4 py-3.5 hover:bg-card-2 transition">
+          <Link to="/mystery#envelopes" className="flex items-center gap-3 px-4 py-3.5 hover:bg-card-2 transition">
             <span className="text-2xl leading-none shrink-0">{unopened > 0 ? '💌' : '✉️'}</span>
             <div className="flex-1 min-w-0">
               {unopened > 0
