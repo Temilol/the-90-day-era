@@ -13,7 +13,7 @@ import { BADGES } from '@/content/badges'
 import { Card, Progress, Ring, Sparkles, Modal } from '@/components/ui'
 import { burst } from '@/components/Celebrate'
 import { RecapPhotos } from '@/components/Photos'
-import { WalkPlanCard, planSummary } from '@/components/WalkPlan'
+import { WalkPlanLine, planSummary } from '@/components/WalkPlan'
 import { nextEnvelope } from '@/lib/prizes'
 import { CAPSULE_FROM_DAY, CAPSULE_UNTIL_DAY } from '@/components/Envelopes'
 import { SHIFTS } from '@/components/DayPanel'
@@ -68,7 +68,7 @@ export default function Dashboard() {
           <h1 className="h-display text-3xl sm:text-4xl">{stats.finished ? 'You finished your era.' : `Day ${stats.displayDay} of ${TOTAL_DAYS}`}</h1>
           <div className="text-sm text-muted">{formatDate(today, { weekday: 'long', month: 'long', day: 'numeric' })} · {chapter.emoji} Chapter {chapter.n}: {chapter.name}</div>
         </div>
-        <Link to="/xp" className="card px-3 py-2 text-right shrink-0">
+        <Link to="/xp" className="card px-4 py-2 text-center shrink-0">
           <div className="text-[10px] font-bold uppercase tracking-wider text-muted">Level {stats.level.level}</div>
           <div className="font-semibold gradient-text leading-tight">{stats.level.title}</div>
         </Link>
@@ -87,6 +87,7 @@ export default function Dashboard() {
                 <div className={`text-xs font-bold uppercase tracking-[0.2em] ${workoutDone ? 'text-white/80' : 'text-lavender-500'}`}>{workoutDone ? 'Mission complete' : restDone ? 'Recovery day' : 'Today’s mission'}</div>
                 <div className="h-display text-xl sm:text-2xl mt-0.5">{workoutDone ? `${d!.workout!.minutes}-minute walk done` : restDone ? 'Rest logged. Proud of you.' : 'Incline 12 · 3 mph · 30 min'}</div>
                 <div className={`text-sm mt-1 ${workoutDone ? 'text-white/85' : 'text-muted'}`}>{questsDone}/{quests.length} daily quests · {d?.shift ? SHIFTS.find((x) => x.id === d.shift)?.label.toLowerCase() : 'shift not set'}</div>
+                {stats.started && !stats.finished && <WalkPlanLine date={today} />}
               </div>
               <ArrowRight className={workoutDone ? 'text-white' : 'text-lavender-400'} />
             </div>
@@ -102,69 +103,63 @@ export default function Dashboard() {
         <Card className="!p-4"><div className="text-xs font-semibold uppercase tracking-wider text-muted flex items-center gap-1"><SparkIcon size={12} className="text-lavender-500" />XP</div><div className="h-display text-2xl mt-1">{stats.balanceXp}</div><div className="text-xs text-muted">{stats.lifetimeXp} lifetime</div></Card>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        {/* Chapter */}
-        <Card className="relative overflow-hidden">
-          <div className={`absolute -right-10 -top-10 size-40 rounded-full bg-gradient-to-br ${chapter.gradient} opacity-30 blur-2xl`} />
-          <div className="relative">
-            <div className="text-xs font-bold uppercase tracking-[0.2em] text-lavender-500">Chapter {chapter.n} · {chapter.range}</div>
-            <div className="h-display text-2xl mt-1">{chapter.emoji} {chapter.name}</div>
-            <p className="text-sm text-muted mt-1">{chapter.theme}</p>
-            <Progress value={chapterPct} className="mt-4" />
-            <div className="flex justify-between text-xs text-muted mt-1.5"><span>Day {chapter.from}</span><span>Next milestone: Day {nextMilestone} · {formatDate(dateForDay(stats.startDate!, nextMilestone))}</span></div>
-            {CHAPTERS.filter((c) => stats.currentDay > c.to).length > 0 && (
-              <div className="flex gap-2 mt-3 flex-wrap">{CHAPTERS.filter((c) => stats.currentDay > c.to).map((c) => <button key={c.n} onClick={() => setCelebration(`ch${c.n}`)} className="chip bg-card-2 text-muted hover:text-ink">{c.emoji} Chapter {c.n} recap</button>)}</div>
-            )}
-          </div>
-        </Card>
+      {/* Chapter */}
+      <Card className="relative overflow-hidden">
+        <div className={`absolute -right-10 -top-10 size-40 rounded-full bg-gradient-to-br ${chapter.gradient} opacity-30 blur-2xl`} />
+        <div className="relative">
+          <div className="text-xs font-bold uppercase tracking-[0.2em] text-lavender-500">Chapter {chapter.n} · {chapter.range}</div>
+          <div className="h-display text-2xl mt-1">{chapter.emoji} {chapter.name}</div>
+          <p className="text-sm text-muted mt-1">{chapter.theme}</p>
+          <Progress value={chapterPct} className="mt-4" />
+          <div className="flex justify-between text-xs text-muted mt-1.5"><span>Day {chapter.from}</span><span>Next milestone: Day {nextMilestone} · {formatDate(dateForDay(stats.startDate!, nextMilestone))}</span></div>
+          {CHAPTERS.filter((c) => stats.currentDay > c.to).length > 0 && (
+            <div className="flex gap-2 mt-3 flex-wrap">{CHAPTERS.filter((c) => stats.currentDay > c.to).map((c) => <button key={c.n} onClick={() => setCelebration(`ch${c.n}`)} className="chip bg-card-2 text-muted hover:text-ink">{c.emoji} Chapter {c.n} recap</button>)}</div>
+          )}
+        </div>
+      </Card>
 
-        {/* Boss */}
-        <Link to="/bosses" className={`card p-5 flex items-center gap-4 hover:shadow-glow transition ${bossClose ? 'ring-2 ring-gold-400' : ''}`}>
-          <div className="size-14 rounded-2xl grid place-items-center text-3xl bg-gradient-to-br from-lavender-100 to-blush-100 dark:from-lavender-500/30 dark:to-blush-500/20">{boss.emoji}</div>
+      {/* What's next: the week's boss, then the smaller things worth a tap */}
+      <Card className="!p-0 overflow-hidden divide-y divide-line">
+        <Link to="/bosses" className={`flex items-center gap-3 px-4 py-3.5 transition ${bossClose || (bp.complete && !bossDone) ? 'bg-gold-400/15 ring-2 ring-inset ring-gold-400' : 'hover:bg-card-2'}`}>
+          <span className="text-2xl leading-none shrink-0">{boss.emoji}</span>
           <div className="flex-1 min-w-0">
             <div className="text-xs font-bold uppercase tracking-[0.2em] text-lavender-500">Week {stats.week} boss</div>
-            <div className="font-semibold truncate">{boss.name}</div>
-            <Progress value={bossDone ? 1 : bp.pct} className="mt-2" height="h-1.5" color={bossDone ? 'from-mint-400 to-mint-300' : undefined} />
-            <div className="text-xs text-muted mt-1">{bossDone ? 'Defeated ⚔️' : bp.complete ? 'Ready to claim!' : bossClose ? `One step left · ${bp.done}/${bp.total}` : `${Math.round(bp.pct * 100)}% · ${bp.done}/${bp.total}`}</div>
+            <div className="font-semibold break-words">{boss.name}</div>
+            <Progress value={bossDone ? 1 : bp.pct} className="mt-2" height="h-1.5" color={bossDone ? 'from-mint-400 to-mint-300' : bossClose || bp.complete ? 'from-gold-400 to-gold-300' : undefined} />
+            <div className="text-xs text-muted mt-1">{bossDone ? 'Defeated ⚔️' : bp.complete ? 'Ready to claim!' : bossClose ? `One step left · ${bp.done} of ${bp.total}` : `${Math.round(bp.pct * 100)}% · ${bp.done} of ${bp.total}`}</div>
           </div>
-          {bp.complete && !bossDone ? <button onClick={(e) => { e.preventDefault(); claimBoss(boss.id); burst({ big: true }) }} className="btn-primary !py-1.5 text-xs shrink-0">Claim</button> : <Swords className="text-lavender-400" size={18} />}
+          {bp.complete && !bossDone ? <button onClick={(e) => { e.preventDefault(); claimBoss(boss.id); burst({ big: true }) }} className="btn-primary !py-1.5 text-xs shrink-0">Claim</button> : <Swords size={18} className="text-lavender-400 shrink-0" />}
         </Link>
-      </div>
-
-      {stats.started && !stats.finished && <WalkPlanCard date={today} setShiftHref="/today" />}
-
-      {stats.started && (unopened > 0 || upcoming) && (
-        <Link to="/mystery" className="card !p-4 flex items-center gap-3 hover:shadow-glow transition min-w-0">
-          <span className="text-2xl leading-none shrink-0">{unopened > 0 ? '💌' : '✉️'}</span>
-          <div className="flex-1 min-w-0">
-            {unopened > 0
-              ? <><div className="text-sm font-semibold">{unopened} {unopened === 1 ? 'envelope is' : 'envelopes are'} ready to open</div><div className="text-xs text-muted">Pick one of three rewards.</div></>
-              : <><div className="text-sm font-semibold break-words">{upcoming!.need} to your next envelope</div><div className="text-xs text-muted break-words">{upcoming!.title}</div></>}
-          </div>
-          <ArrowRight size={16} className="text-lavender-400 shrink-0" />
-        </Link>
-      )}
-      {askCapsule && (
-        <Link to="/mystery#capsule" className="card !p-4 flex items-center gap-3 hover:shadow-glow transition min-w-0">
-          <span className="text-2xl leading-none shrink-0">💌</span>
-          <div className="flex-1 min-w-0"><div className="text-sm font-semibold">Write to your Day 90 self</div><div className="text-xs text-muted">A short letter, sealed today and handed back at the finish.</div></div>
-          <ArrowRight size={16} className="text-lavender-400 shrink-0" />
-        </Link>
-      )}
-
-      {tomorrow?.shift && !stats.finished && (
-        <Card className="!p-4 flex items-start gap-3">
-          <span className="text-2xl">{SHIFTS.find((x) => x.id === tomorrow.shift)?.emoji}</span>
-          <div><div className="text-xs font-bold uppercase tracking-[0.2em] text-lavender-500">Tomorrow · {formatDate(tomorrowKey)}</div><div className="text-sm mt-0.5">{planSummary(tomorrow.shift, tomorrow.hours)}</div></div>
-        </Card>
-      )}
-      {!tomorrow?.shift && stats.started && !stats.finished && (
-        <Link to="/shifts" className="card !p-4 flex items-center gap-3 hover:shadow-glow transition">
-          <span className="text-2xl">📅</span>
-          <div className="flex-1"><div className="text-sm font-semibold">Plan tomorrow</div><div className="text-xs text-muted">Fill in your schedule once and every day gets its own walk plan.</div></div>
-          <ArrowRight size={16} className="text-lavender-400" />
-        </Link>
-      )}
+        {stats.started && (unopened > 0 || upcoming) && (
+          <Link to="/mystery" className="flex items-center gap-3 px-4 py-3.5 hover:bg-card-2 transition">
+            <span className="text-2xl leading-none shrink-0">{unopened > 0 ? '💌' : '✉️'}</span>
+            <div className="flex-1 min-w-0">
+              {unopened > 0
+                ? <><div className="text-sm font-semibold">{unopened} {unopened === 1 ? 'envelope is' : 'envelopes are'} ready to open</div><div className="text-xs text-muted">Pick one of three rewards.</div></>
+                : <><div className="text-sm font-semibold break-words">{upcoming!.need} to your next envelope</div><div className="text-xs text-muted break-words">{upcoming!.title}</div></>}
+            </div>
+            <ArrowRight size={16} className="text-lavender-400 shrink-0" />
+          </Link>
+        )}
+        {askCapsule && (
+          <Link to="/mystery#capsule" className="flex items-center gap-3 px-4 py-3.5 hover:bg-card-2 transition">
+            <span className="text-2xl leading-none shrink-0">📝</span>
+            <div className="flex-1 min-w-0"><div className="text-sm font-semibold">Write to your Day 90 self</div><div className="text-xs text-muted">A short letter, sealed today and handed back at the finish.</div></div>
+            <ArrowRight size={16} className="text-lavender-400 shrink-0" />
+          </Link>
+        )}
+        {stats.started && !stats.finished && (
+          <Link to="/shifts" className="flex items-center gap-3 px-4 py-3.5 hover:bg-card-2 transition">
+            <span className="text-2xl leading-none shrink-0">{tomorrow?.shift ? SHIFTS.find((x) => x.id === tomorrow.shift)?.emoji : '📅'}</span>
+            <div className="flex-1 min-w-0">
+              {tomorrow?.shift
+                ? <><div className="text-sm font-semibold">Tomorrow · {formatDate(tomorrowKey)}</div><div className="text-xs text-muted break-words">{planSummary(tomorrow.shift, tomorrow.hours)}</div></>
+                : <><div className="text-sm font-semibold">Plan tomorrow</div><div className="text-xs text-muted">Fill in your schedule once and every day gets its own walk plan.</div></>}
+            </div>
+            <ArrowRight size={16} className="text-lavender-400 shrink-0" />
+          </Link>
+        )}
+      </Card>
 
       {/* Quote */}
       <Card className="text-center py-7 relative overflow-hidden">
