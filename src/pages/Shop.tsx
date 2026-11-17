@@ -5,7 +5,7 @@ import { prizeDef } from '@/content/envelopes'
 import { todayKey } from '@/lib/dates'
 import { useStore } from '@/store/useStore'
 import { useStats } from '@/lib/hooks'
-import { PageHeader, Card, Modal, Progress, SectionTitle, Empty } from '@/components/ui'
+import { PageHeader, Card, Modal, Progress, SectionTitle, Empty, confirmDialog } from '@/components/ui'
 import { burst } from '@/components/Celebrate'
 import { Pencil, Plus, Trash2, ImagePlus, ExternalLink, X } from 'lucide-react'
 import { XP } from '@/lib/xp'
@@ -80,7 +80,7 @@ export default function Shop() {
                 <button className={can ? 'btn-primary !py-1.5' : 'btn-soft !py-1.5'} disabled={!can} onClick={() => { setCouponId(stats.spendableXp >= r.cost ? null : coupons.find((c) => stats.spendableXp >= priceOf(r, c.pct))?.id ?? null); setConfirmBuy(r) }}>{can ? 'Unlock' : `${r.cost - stats.spendableXp} XP to go`}</button>
                 <div className="flex gap-1">
                   <button className="btn-ghost p-1.5" onClick={() => setEdit(r)} aria-label="Edit"><Pencil size={14} /></button>
-                  <button className="btn-ghost p-1.5" onClick={() => { if (confirm(`Remove "${r.name}" from the shop?`)) removeReward(r.id) }} aria-label="Remove"><Trash2 size={14} /></button>
+                  <button className="btn-ghost p-1.5" onClick={async () => { if (await confirmDialog(`Remove “${r.name}” from the shop?`, { confirmLabel: 'Remove', cancelLabel: 'Keep it', danger: true })) removeReward(r.id) }} aria-label="Remove"><Trash2 size={14} /></button>
                 </div>
               </div>
               </div>

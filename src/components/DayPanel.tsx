@@ -6,7 +6,7 @@ import { walkXp, XP, earnsShiftBonus, ACTIVITY_MIN_MINUTES, stepGoalOf } from '@
 import { DEFAULT_ELECTIVE } from '@/lib/walkPlan'
 import type { ShiftType } from '@/lib/types'
 import { THEMES } from '@/content/themes'
-import { Check, Modal, Progress } from './ui'
+import { Check, Modal, Progress, confirmDialog } from './ui'
 import { waterSettings, fromMl, toMl, goalMet } from '@/lib/water'
 import { burst, hearts } from './Celebrate'
 import { tap } from '@/lib/haptics'
@@ -231,7 +231,7 @@ export function WorkoutCard({ date, locked }: { date: string; locked?: boolean }
           {!locked && (
             <div className="flex items-center gap-1 shrink-0">
               <button className="rounded-full bg-white/20 hover:bg-white/30 p-2" aria-label="Edit this walk" onClick={() => { setMinutes(d!.workout!.minutes); setIncline(d!.workout!.incline); setSpeed(d!.workout!.speed); setNotes(d!.workout!.notes || ''); setCustom(true) }}><Pencil size={14} /></button>
-              <button className="rounded-full bg-white/20 hover:bg-white/30 p-2" aria-label="Remove this walk" onClick={() => { if (confirm('Remove this workout log? Its XP will be removed too.')) removeWorkout(date) }}><Trash2 size={14} /></button>
+              <button className="rounded-full bg-white/20 hover:bg-white/30 p-2" aria-label="Remove this walk" onClick={async () => { if (await confirmDialog('Remove this walk? Its XP will be removed too.', { confirmLabel: 'Remove', cancelLabel: 'Keep it', danger: true })) removeWorkout(date) }}><Trash2 size={14} /></button>
             </div>
           )}
         </div>

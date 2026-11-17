@@ -4,7 +4,7 @@ import { MailCheck, Cloud, CloudOff, RefreshCw, LogOut, Check, TriangleAlert, Ey
 import { useSync, syncConfigured, EMAIL_CODES, type Conflict } from '@/store/sync'
 import { useStore } from '@/store/useStore'
 import { computeStats } from '@/lib/stats'
-import { Modal } from './ui'
+import { Modal, confirmDialog } from './ui'
 import type { EraState } from '@/lib/types'
 
 type Mode = 'signin' | 'signup' | 'reset' | 'verify' | 'reset-code' | 'link'
@@ -107,7 +107,7 @@ export function AccountPanel({ onSignedIn }: { onSignedIn?: () => void }) {
         {sync.lastSyncedAt && <div className="text-xs text-muted">Last synced {new Date(sync.lastSyncedAt).toLocaleString()}</div>}
         <div className="grid grid-cols-2 gap-2">
           <button className="btn-soft" disabled={sync.status === 'syncing'} onClick={() => void sync.syncNow()}><RefreshCw size={15} /> Sync now</button>
-          <button className="btn-ghost border border-line" onClick={() => { if (confirm('Sign out? Your data stays on this device and in the cloud.')) void sync.signOut() }}><LogOut size={15} /> Sign out</button>
+          <button className="btn-ghost border border-line" onClick={async () => { if (await confirmDialog('Sign out? Your data stays on this device and in the cloud.', { confirmLabel: 'Sign out' })) void sync.signOut() }}><LogOut size={15} /> Sign out</button>
         </div>
         <div className="flex items-center justify-between pt-1 text-xs">
           <button className="inline-flex items-center gap-1.5 text-muted hover:text-ink font-medium" onClick={() => setDialog('password')}><KeyRound size={13} /> Change password</button>

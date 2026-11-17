@@ -7,7 +7,7 @@ import { useStats } from '@/lib/hooks'
 import { todayKey, addDays, formatDate } from '@/lib/dates'
 import { resetTimes } from '@/lib/dayReset'
 import { ResetSelect } from '@/components/DayReset'
-import { PageHeader, Card, SectionTitle, Modal } from '@/components/ui'
+import { PageHeader, Card, SectionTitle, Modal, confirmDialog } from '@/components/ui'
 import { Download, Upload, Moon, Sun, Monitor, Vibrate, EyeOff, Images, ChevronRight, ChevronLeft, UserRound, Bell, Target, Clock, Palette, ShieldCheck, type LucideIcon } from 'lucide-react'
 import { downloadAllPhotos } from '@/store/photos'
 import { waterSettings, fromMl, toMl, convertWaterSettings, type WaterUnit } from '@/lib/water'
@@ -76,7 +76,7 @@ function useSettings() {
   }
   const doImport = async (f: File) => {
     const text = await f.text()
-    if (!confirm('Importing replaces everything currently saved on this device. Continue?')) return
+    if (!(await confirmDialog('Importing replaces everything currently saved on this device. Continue?', { confirmLabel: 'Import', danger: true }))) return
     const r = importData(text)
     setMsg(r.ok ? 'Import complete.' : r.error || 'Import failed.')
     if (r.ok) { setName(useStore.getState().profile.name); setStart(useStore.getState().profile.startDate ?? todayKey()) }
@@ -160,7 +160,7 @@ export default function SettingsPage() {
       <section>
         <SectionTitle sub={hasLogs ? 'You have logged days. Changing the start date shifts which calendar day each log belongs to, so only do this if Day 1 was set wrong.' : 'Change freely until you log your first day.'}>Challenge start date</SectionTitle>
         <Card>
-          <div className="flex gap-2"><input type="date" className="input" value={start} onChange={(e) => setStart(e.target.value)} /><button className="btn-primary" disabled={start === profile.startDate} onClick={() => { if (!hasLogs || confirm('Change start date? Existing logs stay on their calendar dates but their Day numbers will shift.')) setProfile({ startDate: start }) }}>Set</button></div>
+          <div className="flex gap-2"><input type="date" className="input" value={start} onChange={(e) => setStart(e.target.value)} /><button className="btn-primary" disabled={start === profile.startDate} onClick={async () => { if (!hasLogs || await confirmDialog('Change start date? Existing logs stay on their calendar dates but their Day numbers will shift.', { confirmLabel: 'Change it' })) setProfile({ startDate: start }) }}>Set</button></div>
           <div className="text-xs text-muted mt-2">Day 1: {formatDate(start, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} · Day 90: {formatDate(addDays(start, 89), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>
         </Card>
       </section>

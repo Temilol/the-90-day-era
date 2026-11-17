@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 
 export type Theme = 'system' | 'light' | 'dark'
 export interface Toast { id: number; title: string; sub?: string; kind: 'xp' | 'info' | 'warn' | 'success' }
+export interface Ask { message: string; confirmLabel: string; cancelLabel: string; danger: boolean; resolve: (ok: boolean) => void }
 export interface Unlock { id: string; name: string; emoji: string; desc: string; kind: 'badge' | 'level' | 'boss' | 'envelope' }
 
 interface UiState {
@@ -20,12 +21,16 @@ interface UiState {
   shiftUnlock: () => void
   celebration: string | null
   setCelebration: (c: string | null) => void
+  ask: Ask | null
+  /** Ask a yes/no question in the app itself. Resolves true only when the person confirms. */
+  confirm: (message: string, opts?: { confirmLabel?: string; cancelLabel?: string; danger?: boolean }) => Promise<boolean>
+  answer: (ok: boolean) => void
 }
 
 let toastId = 0
 export const useUi = create<UiState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       theme: 'system',
       setTheme: (theme) => set({ theme }),
       haptics: true,
@@ -44,6 +49,12 @@ export const useUi = create<UiState>()(
       shiftUnlock: () => set((s) => ({ unlocks: s.unlocks.slice(1) })),
       celebration: null,
       setCelebration: (celebration) => set({ celebration }),
+      ask: null,
+      confirm: (message, opts) => new Promise<boolean>((resolve) => {
+        get().ask?.resolve(false) // a question still open is answered "no"
+        set({ ask: { message, confirmLabel: opts?.confirmLabel ?? 'Yes', cancelLabel: opts?.cancelLabel ?? 'Cancel', danger: !!opts?.danger, resolve } })
+      }),
+      answer: (ok) => { const a = get().ask; set({ ask: null }); a?.resolve(ok) },
     }),
     { name: 'era-ui', partialize: (s) => ({ theme: s.theme, haptics: s.haptics, blurPhotos: s.blurPhotos }) },
   ),

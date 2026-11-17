@@ -2,6 +2,7 @@ import { clsx } from 'clsx'
 import { motion } from 'framer-motion'
 import { useEffect, type ReactNode } from 'react'
 import { X } from 'lucide-react'
+import { useUi } from '@/store/ui'
 
 export function Card({ children, className, onClick }: { children: ReactNode; className?: string; onClick?: () => void }) {
   return <div onClick={onClick} className={clsx('card p-5', onClick && 'cursor-pointer hover:shadow-glow transition', className)}>{children}</div>
@@ -138,6 +139,32 @@ export function Sparkles({ className }: { className?: string }) {
   )
 }
 
-export function confirmDialog(message: string) {
-  return window.confirm(message)
+/** Ask before doing something that removes or replaces data. Shown inside the app, so it works wherever the app runs. */
+export function confirmDialog(message: string, opts?: { confirmLabel?: string; cancelLabel?: string; danger?: boolean }): Promise<boolean> {
+  return useUi.getState().confirm(message, opts)
+}
+
+/** Shows the question asked through confirmDialog. Mounted once, at the top of the app. */
+export function ConfirmHost() {
+  const ask = useUi((s) => s.ask)
+  const answer = useUi((s) => s.answer)
+  useEffect(() => {
+    if (!ask) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') answer(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [ask, answer])
+  if (!ask) return null
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" role="alertdialog" aria-modal aria-label={ask.message}>
+      <div className="absolute inset-0 bg-ink/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => answer(false)} />
+      <div className="relative card w-full sm:max-w-sm p-5 rounded-b-none sm:rounded-b-3xl">
+        <p className="text-sm">{ask.message}</p>
+        <div className="grid grid-cols-2 gap-2 mt-4">
+          <button className="btn-soft" onClick={() => answer(false)}>{ask.cancelLabel}</button>
+          <button className={ask.danger ? 'btn-danger' : 'btn-primary'} autoFocus onClick={() => answer(true)}>{ask.confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  )
 }

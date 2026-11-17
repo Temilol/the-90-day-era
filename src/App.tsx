@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { ConfirmHost } from './components/ui'
 import { Layout } from './components/Layout'
 import { useStore } from './store/useStore'
 import { useSync } from './store/sync'
@@ -22,6 +23,10 @@ const Shifts = lazy(() => import('./pages/Shifts'))
 const SettingsPage = lazy(() => import('./pages/Settings'))
 
 export default function App() {
+  return <><Screens /><ConfirmHost /></>
+}
+
+function Screens() {
   const onboarded = useStore((s) => s.profile.onboarded)
   const fromEmail = useSync((s) => s.recovery || s.arrivedFrom === 'signup')
   if (fromEmail) return <EmailLinkLanding />
