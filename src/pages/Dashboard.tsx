@@ -17,7 +17,7 @@ import { WalkPlanLine, planSummary } from '@/components/WalkPlan'
 import { nextEnvelope } from '@/lib/prizes'
 import { CAPSULE_FROM_DAY, CAPSULE_UNTIL_DAY } from '@/components/Envelopes'
 import { SHIFTS } from '@/components/DayPanel'
-import { ArrowRight, Flame, Sparkles as SparkIcon, Swords, Gift, CalendarDays, BookHeart, ShoppingBag, Trophy } from 'lucide-react'
+import { ArrowRight, Flame, Sparkles as SparkIcon, Swords, Gift, BookHeart, ShoppingBag, Trophy } from 'lucide-react'
 import { DayResetBanner } from '@/components/DayReset'
 
 export default function Dashboard() {
@@ -170,17 +170,15 @@ export default function Dashboard() {
         </div>
       </Card>
 
-      {/* Quick links */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+      {/* Quick links: the places that are not already in the bottom bar */}
+      <div className="grid grid-cols-4 gap-2">
         {[
           { to: '/mystery', icon: Gift, label: 'Mystery', badge: unopened },
-          { to: '/calendar', icon: CalendarDays, label: 'Calendar' },
           { to: '/journal', icon: BookHeart, label: 'Journal' },
           { to: '/rewards#shop', icon: ShoppingBag, label: 'Shop' },
           { to: '/rewards#badges', icon: Trophy, label: 'Badges' },
-          { to: '/bosses', icon: Swords, label: 'Bosses' },
         ].map((q) => (
-          <Link key={q.to} to={q.to} className="card p-3 flex flex-col items-center gap-1.5 text-xs font-medium relative hover:shadow-glow transition">
+          <Link key={q.to} to={q.to} className="card px-1 py-3 flex flex-col items-center gap-1.5 text-xs font-medium text-center relative hover:shadow-glow transition">
             <q.icon size={20} className="text-lavender-500" />{q.label}
             {!!q.badge && <span className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-blush-500 text-white text-[10px] grid place-items-center font-bold">{q.badge}</span>}
           </Link>
