@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { useStore } from '@/store/useStore'
 import { todayKey, formatDate } from '@/lib/dates'
-import { PageHeader, Card, SectionTitle, Empty } from '@/components/ui'
+import { PageHeader, Card, SectionTitle, Empty, Modal } from '@/components/ui'
 import { hearts } from '@/components/Celebrate'
 import { Trash2, Camera, X } from 'lucide-react'
 import { shrinkPhoto } from '@/lib/photoStore'
@@ -10,6 +10,12 @@ import { savePhoto } from '@/store/photos'
 import { useUi } from '@/store/ui'
 import { ProgressPhotos, PhotoImg, PhotoViewer } from '@/components/Photos'
 import { clsx } from 'clsx'
+
+type Tab = 'weigh' | 'photos' | 'wins'
+const TABS: { id: Tab; label: string }[] = [{ id: 'weigh', label: 'Weigh-ins' }, { id: 'photos', label: 'Photos' }, { id: 'wins', label: 'Wins' }]
+const LAST_TAB = 'era-weight-tab'
+const lastTab = (): Tab => { try { const v = localStorage.getItem(LAST_TAB); return v === 'photos' || v === 'wins' ? v : 'weigh' } catch { return 'weigh' } }
+const RECENT_WINS = 3
 
 const NSV_CATS = [['💨', 'Endurance'], ['👖', 'Clothes fit'], ['⚡', 'Energy'], ['💁‍♀️', 'Confidence'], ['📈', 'Consistency'], ['😴', 'Sleep'], ['🌈', 'Mood'], ['✨', 'Other']]
 
@@ -21,6 +27,9 @@ export default function Weight() {
   const removeWeight = useStore((s) => s.removeWeight)
   const addNsv = useStore((s) => s.addNsv)
   const removeNsv = useStore((s) => s.removeNsv)
+  const [tab, setTab] = useState<Tab>(lastTab)
+  const pick = (next: Tab) => { setTab(next); try { localStorage.setItem(LAST_TAB, next) } catch { /* private mode */ } }
+  const [allWins, setAllWins] = useState(false)
   const [date, setDate] = useState(todayKey())
   const [value, setValue] = useState('')
   const [cat, setCat] = useState(NSV_CATS[0][1])
@@ -58,12 +67,24 @@ export default function Weight() {
   const photoOn = (d: string) => photos.find((p) => p.date === d)
   const first = weights[0]?.value
   const last = weights[weights.length - 1]?.value
+  const renderWin = (n: (typeof nsvs)[number]) => (
+    <div key={n.id} className="flex items-start gap-3 rounded-2xl bg-card-2 p-3 text-sm">
+      <span className="text-xl">{NSV_CATS.find((c) => c[1] === n.category)?.[0] ?? '✨'}</span>
+      <div className="flex-1 min-w-0"><div className="break-words">{n.text}</div><div className="text-xs text-muted">{n.category} · {formatDate(n.date)}</div></div>
+      <button className="btn-ghost p-1" onClick={() => removeNsv(n.id)} aria-label="Delete this win"><Trash2 size={14} /></button>
+    </div>
+  )
   const data = weights.map((w) => ({ ...w, label: formatDate(w.date, { month: 'short', day: 'numeric' }) }))
 
   return (
     <div className="space-y-6">
       <PageHeader title="Weight & Wins" emoji="⚖️" sub="Optional. Weigh in when you want to, and give the non-scale victories equal billing." />
 
+      <div role="tablist" aria-label="Weight and wins sections" className="grid grid-cols-3 gap-1 rounded-full bg-card-2 p-1 text-sm font-semibold -mt-2">
+        {TABS.map((x) => <button key={x.id} type="button" role="tab" aria-selected={tab === x.id} onClick={() => pick(x.id)} className={clsx('rounded-full py-2 text-center transition', tab === x.id ? 'bg-card shadow-soft text-ink' : 'text-muted')}>{x.label}</button>)}
+      </div>
+
+      {tab === 'weigh' && (
       <section>
         <SectionTitle sub="Trend over time matters more than any single number. Weekly is plenty. A photo can go with a weigh-in, or stand alone.">Check-in</SectionTitle>
         <Card>
@@ -104,10 +125,13 @@ export default function Weight() {
           {weights.length === 0 && <p className="text-xs text-muted mt-3">No entries yet. This is optional, and totally fine to skip.</p>}
         </Card>
       </section>
+      )}
 
-      <ProgressPhotos />
+      {/* Kept mounted (just hidden) so the compare pickers keep their choices when she switches tabs. */}
+      <div hidden={tab !== 'photos'}><ProgressPhotos /></div>
       <PhotoViewer photo={photos.find((p) => p.id === viewing) ?? null} onClose={() => setViewing(null)} />
 
+      {tab === 'wins' && (
       <section>
         <SectionTitle sub="Things the scale can’t measure.">Non-scale victories</SectionTitle>
         <Card>
@@ -119,16 +143,16 @@ export default function Weight() {
             <button className="btn-primary" type="submit">Add</button>
           </form>
           <div className="mt-4 space-y-2">
-            {nsvs.length === 0 ? <Empty emoji="🪄" title="No victories yet" sub="They add up faster than you think." /> : nsvs.map((n) => (
-              <div key={n.id} className="flex items-start gap-3 rounded-2xl bg-card-2 p-3 text-sm">
-                <span className="text-xl">{NSV_CATS.find((c) => c[1] === n.category)?.[0] ?? '✨'}</span>
-                <div className="flex-1"><div>{n.text}</div><div className="text-xs text-muted">{n.category} · {formatDate(n.date)}</div></div>
-                <button className="btn-ghost p-1" onClick={() => removeNsv(n.id)}><Trash2 size={14} /></button>
-              </div>
-            ))}
+            {nsvs.length === 0 ? <Empty emoji="🪄" title="No victories yet" sub="They add up faster than you think." /> : nsvs.slice(0, RECENT_WINS).map(renderWin)}
           </div>
+          {nsvs.length > RECENT_WINS && <button type="button" className="btn-soft w-full mt-3" onClick={() => setAllWins(true)}>See all wins ({nsvs.length})</button>}
         </Card>
       </section>
+      )}
+
+      <Modal open={allWins} onClose={() => setAllWins(false)} title="All your wins">
+        <div className="space-y-2">{nsvs.map(renderWin)}</div>
+      </Modal>
     </div>
   )
 }
