@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { motion } from 'framer-motion'
+import { ChevronDown } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { useStats } from '@/lib/hooks'
 import { ENVELOPE_DEFS, TIERS, prizeDef, isSecret, LEGACY_REWARD_EMOJI, type EnvelopeDef } from '@/content/envelopes'
@@ -108,29 +109,48 @@ export function EnvelopeGrid() {
   const ready = Object.values(envelopes).filter((e) => !e.openedAt).length
   const secretsFound = ENVELOPE_DEFS.filter((d) => isSecret(d) && envelopes[d.id]).length
   const secretsTotal = ENVELOPE_DEFS.filter(isSecret).length
+  // What she can act on comes first (ready, then opened with the newest on top); everything still locked folds into one row.
+  const stateOf = (def: EnvelopeDef) => { const e = envelopes[def.id]; return !e ? 'locked' : e.openedAt ? 'opened' : 'ready' }
+  const readyDefs = ENVELOPE_DEFS.filter((d) => stateOf(d) === 'ready')
+  const openedDefs = ENVELOPE_DEFS.filter((d) => stateOf(d) === 'opened').sort((a, b) => envelopes[b.id].openedAt!.localeCompare(envelopes[a.id].openedAt!))
+  const unlocked = [...readyDefs, ...openedDefs]
+  const locked = ENVELOPE_DEFS.filter((d) => stateOf(d) === 'locked')
+  const lockedSecrets = locked.filter(isSecret).length
+  const [showLocked, setShowLocked] = useState(() => unlocked.length === 0)
+  const renderCard = (def: EnvelopeDef) => {
+    const e = envelopes[def.id]
+    const state = stateOf(def)
+    const won = prizeDef(e?.rewardKey)
+    return (
+      <motion.button key={def.id} whileTap={state !== 'locked' ? { scale: 0.96 } : {}} disabled={state === 'locked'}
+        onClick={() => { if (state === 'ready') drawEnvelope(def.id); setOpen(def.id) }}
+        className={clsx('card p-3.5 text-left relative overflow-hidden min-w-0 flex flex-col', state === 'ready' && `ring-2 shadow-glow ${TIERS[def.tier].ring}`, state === 'locked' && 'opacity-70')}>
+        <motion.div animate={state === 'ready' ? { y: [0, -4, 0] } : {}} transition={{ repeat: Infinity, duration: 1.8 }} className="text-4xl leading-none">
+          {state === 'opened' ? (won?.emoji ?? LEGACY_REWARD_EMOJI[e!.reward ?? ''] ?? '💌') : state === 'ready' ? TIERS[def.tier].emoji : isSecret(def) ? '❔' : '🔒'}
+        </motion.div>
+        <div className="mt-2.5"><TierChip tier={def.tier} /></div>
+        <div className="font-semibold text-sm mt-1.5 leading-tight break-words">{state === 'locked' && isSecret(def) ? '???' : def.title}</div>
+        <div className="text-xs text-muted mt-0.5 break-words">{state === 'locked' ? hintFor(def) : state === 'ready' ? (isSecret(def) ? 'Secret found. Tap to open' : 'Tap to open') : 'Opened'}</div>
+        {state === 'opened' && <div className="text-xs mt-1.5 text-lavender-600 dark:text-lavender-300 line-clamp-2 break-words">{won?.title ?? e!.reward}</div>}
+      </motion.button>
+    )
+  }
   return (
     <section>
       <SectionTitle sub={`${ready ? `${ready} ready to open` : 'Bigger milestones hold better rewards'} · ${secretsFound} of ${secretsTotal} secrets found`}>Mystery envelopes</SectionTitle>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {ENVELOPE_DEFS.map((def) => {
-          const e = envelopes[def.id]
-          const state = !e ? 'locked' : e.openedAt ? 'opened' : 'ready'
-          const won = prizeDef(e?.rewardKey)
-          return (
-            <motion.button key={def.id} whileTap={state !== 'locked' ? { scale: 0.96 } : {}} disabled={state === 'locked'}
-              onClick={() => { if (state === 'ready') drawEnvelope(def.id); setOpen(def.id) }}
-              className={clsx('card p-3.5 text-left relative overflow-hidden min-w-0 flex flex-col', state === 'ready' && `ring-2 shadow-glow ${TIERS[def.tier].ring}`, state === 'locked' && 'opacity-70')}>
-              <motion.div animate={state === 'ready' ? { y: [0, -4, 0] } : {}} transition={{ repeat: Infinity, duration: 1.8 }} className="text-4xl leading-none">
-                {state === 'opened' ? (won?.emoji ?? LEGACY_REWARD_EMOJI[e!.reward ?? ''] ?? '💌') : state === 'ready' ? TIERS[def.tier].emoji : isSecret(def) ? '❔' : '🔒'}
-              </motion.div>
-              <div className="mt-2.5"><TierChip tier={def.tier} /></div>
-              <div className="font-semibold text-sm mt-1.5 leading-tight break-words">{state === 'locked' && isSecret(def) ? '???' : def.title}</div>
-              <div className="text-xs text-muted mt-0.5 break-words">{state === 'locked' ? hintFor(def) : state === 'ready' ? (isSecret(def) ? 'Secret found. Tap to open' : 'Tap to open') : 'Opened'}</div>
-              {state === 'opened' && <div className="text-xs mt-1.5 text-lavender-600 dark:text-lavender-300 line-clamp-2 break-words">{won?.title ?? e!.reward}</div>}
-            </motion.button>
-          )
-        })}
-      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">{unlocked.map(renderCard)}</div>
+      {locked.length > 0 && (
+        <div className={unlocked.length ? 'mt-3' : ''}>
+          <button type="button" aria-expanded={showLocked} onClick={() => setShowLocked((v) => !v)} className="card w-full flex items-center justify-between gap-3 px-4 py-3 text-left">
+            <div className="min-w-0">
+              <div className="text-sm font-medium">Still to earn</div>
+              <div className="text-xs text-muted">{locked.length} {locked.length === 1 ? 'envelope' : 'envelopes'}{lockedSecrets > 0 ? ` · ${lockedSecrets} of them secret` : ''}</div>
+            </div>
+            <ChevronDown size={16} className={clsx('text-muted shrink-0 transition', showLocked && 'rotate-180')} />
+          </button>
+          {showLocked && <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-3">{locked.map(renderCard)}</div>}
+        </div>
+      )}
       <PickModal key={open ?? 'none'} id={open} onClose={() => setOpen(null)} />
     </section>
   )
