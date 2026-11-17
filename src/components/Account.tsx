@@ -65,9 +65,9 @@ function DeleteAccount({ onDone }: { onDone: () => void }) {
   )
 }
 
-export function AccountPanel({ onSignedIn }: { onSignedIn?: () => void }) {
+export function AccountPanel({ onSignedIn, startMode = 'signin' }: { onSignedIn?: () => void; startMode?: 'signin' | 'signup' }) {
   const sync = useSync()
-  const [mode, setMode] = useState<Mode>('signin')
+  const [mode, setMode] = useState<Mode>(startMode)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
