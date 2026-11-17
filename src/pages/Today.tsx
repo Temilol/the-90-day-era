@@ -36,7 +36,7 @@ export default function Today() {
     return (
       <div>
         <PageHeader title="Today’s Mission" emoji="🎯" sub="The 90 days are complete." />
-        <Card className="text-center py-10"><div className="text-5xl">👑</div><div className="mt-2 h-display text-2xl">Era complete</div><div className="text-sm text-muted">Your history, badges, and rewards are all saved. Start a new era from Settings whenever you’re ready.</div></Card>
+        <Card className="text-center py-10"><div className="text-5xl">👑</div><div className="mt-2 h-display text-2xl">Era complete</div><div className="text-sm text-muted text-balance">Your history, badges and rewards stay saved here. Export a backup before you reset anything, because a reset deletes it all.</div><Link to="/settings/data" className="btn-soft mt-5 inline-flex">Open Your data</Link></Card>
       </div>
     )
   }

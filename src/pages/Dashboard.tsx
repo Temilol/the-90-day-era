@@ -58,6 +58,8 @@ export default function Dashboard() {
   const claimBoss = useStore.getState().claimBoss
   const workoutDone = !!d?.workout
   const restDone = !!d?.recovery
+  // The mission card is lit up for a finished walk, and for the end of the whole challenge.
+  const lit = workoutDone || stats.finished
 
   return (
     <div className="space-y-6">
@@ -77,19 +79,19 @@ export default function Dashboard() {
       {/* Hero: today's mission */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
         <Link to="/today" className="block card overflow-hidden relative">
-          <div className={`p-5 sm:p-6 bg-gradient-to-br ${workoutDone ? 'from-lavender-500 to-blush-400 text-white' : 'from-lavender-50 via-card to-blush-50 dark:from-lavender-500/15 dark:via-card dark:to-blush-500/10'}`}>
-            <Sparkles className={workoutDone ? 'text-white/60' : ''} />
+          <div className={`p-5 sm:p-6 bg-gradient-to-br ${lit ? 'from-lavender-500 to-blush-400 text-white' : 'from-lavender-50 via-card to-blush-50 dark:from-lavender-500/15 dark:via-card dark:to-blush-500/10'}`}>
+            <Sparkles className={lit ? 'text-white/60' : ''} />
             <div className="relative flex items-center gap-5">
-              <Ring value={workoutDone ? 1 : restDone ? 1 : 0} size={96} stroke={9} color={workoutDone ? '#fff' : undefined}>
-                <span className="text-3xl">{workoutDone ? '🏆' : restDone ? '🌿' : '🚶‍♀️'}</span>
+              <Ring value={lit || restDone ? 1 : 0} size={96} stroke={9} color={lit ? '#fff' : undefined}>
+                <span className="text-3xl">{stats.finished ? '👑' : workoutDone ? '🏆' : restDone ? '🌿' : '🚶‍♀️'}</span>
               </Ring>
               <div className="flex-1 min-w-0">
-                <div className={`text-xs font-bold uppercase tracking-[0.2em] ${workoutDone ? 'text-white/80' : 'text-lavender-500'}`}>{workoutDone ? 'Mission complete' : restDone ? 'Recovery day' : 'Today’s mission'}</div>
-                <div className="h-display text-xl sm:text-2xl mt-0.5">{workoutDone ? `${d!.workout!.minutes}-minute walk done` : restDone ? 'Rest logged. Proud of you.' : 'Incline 12 · 3 mph · 30 min'}</div>
-                <div className={`text-sm mt-1 ${workoutDone ? 'text-white/85' : 'text-muted'}`}>{questsDone}/{quests.length} daily quests · {d?.shift ? SHIFTS.find((x) => x.id === d.shift)?.label.toLowerCase() : 'shift not set'}</div>
+                <div className={`text-xs font-bold uppercase tracking-[0.2em] ${lit ? 'text-white/80' : 'text-lavender-500'}`}>{stats.finished ? 'Era complete' : workoutDone ? 'Mission complete' : restDone ? 'Recovery day' : 'Today’s mission'}</div>
+                <div className="h-display text-xl sm:text-2xl mt-0.5">{stats.finished ? 'All 90 days done' : workoutDone ? `${d!.workout!.minutes}-minute walk done` : restDone ? 'Rest logged. Proud of you.' : 'Incline 12 · 3 mph · 30 min'}</div>
+                <div className={`text-sm mt-1 ${lit ? 'text-white/85' : 'text-muted'}`}>{stats.finished ? 'Your history, badges and rewards are saved.' : `${questsDone}/${quests.length} daily quests · ${d?.shift ? SHIFTS.find((x) => x.id === d.shift)?.label.toLowerCase() : 'shift not set'}`}</div>
                 {stats.started && !stats.finished && <WalkPlanLine date={today} />}
               </div>
-              <ArrowRight className={workoutDone ? 'text-white' : 'text-lavender-400'} />
+              <ArrowRight className={lit ? 'text-white' : 'text-lavender-400'} />
             </div>
           </div>
         </Link>
@@ -111,7 +113,7 @@ export default function Dashboard() {
           <div className="h-display text-2xl mt-1">{chapter.emoji} {chapter.name}</div>
           <p className="text-sm text-muted mt-1">{chapter.theme}</p>
           <Progress value={chapterPct} className="mt-4" />
-          <div className="flex justify-between text-xs text-muted mt-1.5"><span>Day {chapter.from}</span><span>Next milestone: Day {nextMilestone} · {formatDate(dateForDay(stats.startDate!, nextMilestone))}</span></div>
+          <div className="flex justify-between text-xs text-muted mt-1.5"><span>Day {chapter.from}</span><span>{stats.finished ? 'Day 90 · complete' : `Next milestone: Day ${nextMilestone} · ${formatDate(dateForDay(stats.startDate!, nextMilestone))}`}</span></div>
           {CHAPTERS.filter((c) => stats.currentDay > c.to).length > 0 && (
             <div className="flex gap-2 mt-3 flex-wrap">{CHAPTERS.filter((c) => stats.currentDay > c.to).map((c) => <button key={c.n} onClick={() => setCelebration(`ch${c.n}`)} className="chip bg-card-2 text-muted hover:text-ink">{c.emoji} Chapter {c.n} recap</button>)}</div>
           )}
