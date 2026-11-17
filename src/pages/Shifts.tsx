@@ -108,8 +108,12 @@ export function ShiftTracker() {
   const [fillOpen, setFillOpen] = useState(false)
   const [offset, setOffset] = useState(0)
   const today = todayKey()
-  const start = addDays(today, offset * 14 - 3)
-  const range = Array.from({ length: 14 }, (_, i) => addDays(start, i))
+  // A week at a time, starting from today, so the days coming up are at the top.
+  const start = addDays(today, offset * 7)
+  const range = Array.from({ length: 7 }, (_, i) => addDays(start, i))
+  const short = { month: 'short', day: 'numeric' } as const
+  const rangeText = `${formatDate(range[0], short)} to ${formatDate(range[6], range[0].slice(0, 7) === range[6].slice(0, 7) ? { day: 'numeric' } : short)}`
+  const weekTitle = offset === 0 ? 'This week' : offset === 1 ? 'Next week' : offset === -1 ? 'Last week' : rangeText
   const counts = Object.values(days).reduce((a, d) => { if (d.shift) a[d.shift] = (a[d.shift] || 0) + 1; return a }, {} as Record<string, number>)
 
   return (
@@ -122,7 +126,7 @@ export function ShiftTracker() {
       <Card>
         <div className="flex items-center justify-between mb-3">
           <button className="btn-soft !py-1.5" onClick={() => setOffset(offset - 1)}>← Earlier</button>
-          <div className="text-sm font-semibold">{formatDate(range[0], { month: 'short', day: 'numeric' })} – {formatDate(range[13], { month: 'short', day: 'numeric' })}</div>
+          <div className="text-center min-w-0"><div className="text-sm font-semibold">{weekTitle}</div>{weekTitle !== rangeText && <div className="text-xs text-muted">{rangeText}</div>}</div>
           <button className="btn-soft !py-1.5" onClick={() => setOffset(offset + 1)}>Later →</button>
         </div>
         <div className="space-y-1.5">
@@ -130,9 +134,9 @@ export function ShiftTracker() {
             const sh = days[date]?.shift
             const hrs = days[date]?.hours ?? DEFAULT_ELECTIVE
             return (
-              <div key={date} className={clsx('rounded-2xl p-2', date === today && 'bg-lavender-50 dark:bg-lavender-500/10 ring-1 ring-lavender-300')}>
+              <div key={date} className={clsx('rounded-2xl px-3 py-2', date === today && 'bg-lavender-50 dark:bg-lavender-500/10 ring-1 ring-lavender-300')}>
               <div className="flex items-center gap-2">
-                <div className="w-20 shrink-0 text-xs"><div className="font-semibold">{formatDate(date, { weekday: 'short' })}</div><div className="text-muted">{formatDate(date, { month: 'short', day: 'numeric' })}</div></div>
+                <div className="w-14 sm:w-20 shrink-0 text-xs"><div className="font-semibold">{formatDate(date, { weekday: 'short' })}</div><div className="text-muted">{formatDate(date, { month: 'short', day: 'numeric' })}</div></div>
                 <div className="flex-1 grid grid-cols-5 gap-1">
                   {SHIFTS.map((s) => <button key={s.id} onClick={() => setShift(date, sh === s.id ? undefined : s.id)} className={clsx('rounded-xl py-1.5 text-xs font-medium transition', sh === s.id ? 'bg-gradient-to-r from-lavender-500 to-blush-400 text-white shadow-glow' : 'bg-card-2 text-muted hover:text-ink')}>{s.emoji} <span className="hidden sm:inline">{s.short}</span></button>)}
                 </div>
