@@ -88,12 +88,13 @@ export function Modal({ open, onClose, children, title, wide }: { open: boolean;
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" role="dialog" aria-modal>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-ink/40 dark:bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 26 }}
-        className={clsx('relative card w-full p-5 sm:p-6 max-h-[90vh] overflow-y-auto rounded-b-none sm:rounded-b-3xl', wide ? 'sm:max-w-2xl' : 'sm:max-w-md')}>
-        <div className="flex items-center justify-between mb-3">
+        className={clsx('relative card w-full max-h-[90vh] flex flex-col overflow-hidden rounded-b-none sm:rounded-b-3xl', wide ? 'sm:max-w-2xl' : 'sm:max-w-md')}>
+        {/* The header stays put; only the content below it scrolls. */}
+        <div className="flex items-center justify-between px-5 sm:px-6 pt-5 sm:pt-6 pb-3 shrink-0">
           {title ? <h3 className="h-display text-xl">{title}</h3> : <span />}
           <button onClick={onClose} className="btn-ghost p-2 -mr-2" aria-label="Close"><X size={18} /></button>
         </div>
-        {children}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 sm:px-6 pb-5 sm:pb-6">{children}</div>
       </motion.div>
     </div>
   )
