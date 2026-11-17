@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { clsx } from 'clsx'
 import { Link, useLocation } from 'react-router-dom'
+import { ChevronDown, HelpCircle } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { useStats } from '@/lib/hooks'
 import { dateForDay, formatDate, TOTAL_DAYS, weekOf, addDays } from '@/lib/dates'
@@ -52,6 +53,11 @@ function DayGrid({ start }: { start: string }) {
   const stats = useStats()
   const days = useStore((s) => s.days)
   const [sel, setSel] = useState<number | null>(null)
+  // The chapter she is in starts open; the others fold into one line each.
+  const currentChapter = (stats.finished ? CHAPTERS[CHAPTERS.length - 1] : CHAPTERS.find((c) => stats.displayDay >= c.from && stats.displayDay <= c.to) ?? CHAPTERS[0]).n
+  const [open, setOpen] = useState<Set<number>>(() => new Set([currentChapter]))
+  const [keyFor, setKeyFor] = useState<number | null>(null)
+  const toggle = (n: number) => setOpen((o) => { const next = new Set(o); if (next.has(n)) next.delete(n); else next.add(n); return next })
   const applyFreeze = useStore((s) => s.applyFreeze)
   const removeFreeze = useStore((s) => s.removeFreeze)
 
@@ -79,39 +85,64 @@ function DayGrid({ start }: { start: string }) {
 
   return (
     <>
-      <div className="flex flex-wrap gap-2 text-xs">
-        {[['done', 'Standard walk'], ['modified', 'Modified walk'], ['recovery', 'Recovery'], ['frozen', 'Streak freeze'], ['missed', 'Unlogged'], ['today', 'Today'], ['upcoming', 'Upcoming']].map(([k, l]) => (
-          <span key={k} className="inline-flex items-center gap-1.5 text-muted"><span className={clsx('size-4 rounded-md inline-block', dot[k])} />{l}</span>
-        ))}
-      </div>
-
-      {CHAPTERS.map((c) => (
-        <Card key={c.n} className="relative overflow-hidden">
-          <div className={`absolute -right-8 -top-8 size-32 rounded-full bg-gradient-to-br ${c.gradient} opacity-25 blur-2xl`} />
-          <div className="relative flex items-baseline justify-between mb-3">
-            <div><span className="text-xs font-bold uppercase tracking-[0.2em] text-lavender-500">Chapter {c.n}</span><div className="h-display text-xl">{c.emoji} {c.name}</div></div>
-            <div className="text-xs text-muted">{c.range}</div>
-          </div>
-          <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
-            {Array.from({ length: 30 }, (_, i) => c.from + i).map((n) => {
-              const st = status(n)
-              const date = dateForDay(start, n)
-              const isMilestone = MILESTONES.includes(n)
-              const isBossEnd = n % 7 === 0 || n === 90
-              const shift = days[date]?.shift
-              return (
-                <button key={n} onClick={() => setSel(n)} title={formatDate(date)}
-                  className={clsx('relative aspect-square rounded-xl sm:rounded-2xl text-xs sm:text-sm font-semibold transition active:scale-95 flex flex-col items-center justify-center', dot[st])}>
-                  <span>{n}</span>
-                  {shift && <span className="text-[9px] leading-none opacity-80">{SHIFTS.find((s) => s.id === shift)?.emoji}</span>}
-                  {isMilestone && <span className="absolute -top-1 -right-1 text-[10px]">⭐</span>}
-                  {isBossEnd && !isMilestone && <span className="absolute -top-1 -right-1 text-[10px]">⚔️</span>}
-                </button>
-              )
-            })}
-          </div>
-        </Card>
-      ))}
+      {CHAPTERS.map((c) => {
+        const isOpen = open.has(c.n)
+        const length = c.to - c.from + 1
+        // Days of this chapter that have happened so far, and how many of them had a walk.
+        const passed = Math.max(0, Math.min(c.to, stats.started || stats.finished ? stats.displayDay : 0) - c.from + 1)
+        const walked = Array.from({ length: passed }, (_, i) => c.from + i).filter((n) => days[dateForDay(start, n)]?.workout).length
+        const upcoming = passed === 0
+        const finishedChapter = passed >= length
+        const sub = upcoming ? `Days ${c.from} to ${c.to} · starts ${formatDate(dateForDay(start, c.from), { month: 'short', day: 'numeric' })}`
+          : finishedChapter ? `Days ${c.from} to ${c.to} · ${walked} of ${length} walked`
+          : `Days ${c.from} to ${c.to} · ${walked} of ${passed} walked so far`
+        return (
+          <Card key={c.n} className="relative overflow-hidden !p-0">
+            <div className={`absolute -right-8 -top-8 size-32 rounded-full bg-gradient-to-br ${c.gradient} opacity-25 blur-2xl`} />
+            <button type="button" aria-expanded={isOpen} onClick={() => toggle(c.n)} className="relative w-full flex items-center justify-between gap-3 px-4 py-3 text-left">
+              <div className="min-w-0">
+                <div className="text-xs font-bold uppercase tracking-[0.2em] text-lavender-500">Chapter {c.n}{c.n === currentChapter && !stats.finished && stats.started ? ' · now' : ''}</div>
+                <div className="h-display text-xl">{c.emoji} {c.name}</div>
+                <div className="text-xs text-muted">{sub}</div>
+              </div>
+              <ChevronDown size={16} className={clsx('text-muted shrink-0 transition', isOpen && 'rotate-180')} />
+            </button>
+            {isOpen && (
+              <div className="relative px-4 pb-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <span className="text-xs text-muted min-w-0">Tap a day to open it</span>
+                  <button type="button" aria-expanded={keyFor === c.n} onClick={() => setKeyFor(keyFor === c.n ? null : c.n)} className="btn-soft !py-1 text-xs shrink-0"><HelpCircle size={14} /> Key</button>
+                </div>
+                {keyFor === c.n && (
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-2xl bg-card-2 p-3 mb-3 text-xs text-muted">
+                    {[['done', 'Standard walk'], ['modified', 'Modified walk'], ['recovery', 'Recovery'], ['frozen', 'Streak freeze'], ['missed', 'Unlogged'], ['today', 'Today'], ['upcoming', 'Upcoming']].map(([k, l]) => (
+                      <span key={k} className="inline-flex items-center gap-1.5"><span className={clsx('size-4 rounded-md inline-block shrink-0', dot[k])} />{l}</span>
+                    ))}
+                  </div>
+                )}
+                <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+                  {Array.from({ length: 30 }, (_, i) => c.from + i).map((n) => {
+                    const st = status(n)
+                    const date = dateForDay(start, n)
+                    const isMilestone = MILESTONES.includes(n)
+                    const isBossEnd = n % 7 === 0 || n === 90
+                    const shift = days[date]?.shift
+                    return (
+                      <button key={n} onClick={() => setSel(n)} title={formatDate(date)}
+                        className={clsx('relative aspect-square rounded-xl sm:rounded-2xl text-xs sm:text-sm font-semibold transition active:scale-95 flex flex-col items-center justify-center', dot[st])}>
+                        <span>{n}</span>
+                        {shift && <span className="text-[9px] leading-none opacity-80">{SHIFTS.find((s) => s.id === shift)?.emoji}</span>}
+                        {isMilestone && <span className="absolute -top-1 -right-1 text-[10px]">⭐</span>}
+                        {isBossEnd && !isMilestone && <span className="absolute -top-1 -right-1 text-[10px]">⚔️</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </Card>
+        )
+      })}
 
       <Modal open={sel !== null} onClose={() => setSel(null)} wide title={sel ? `Day ${sel} · ${formatDate(selDate!, { weekday: 'long', month: 'long', day: 'numeric' })}` : ''}>
         {sel && selDate && (
