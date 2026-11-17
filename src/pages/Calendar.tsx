@@ -114,7 +114,7 @@ function DayGrid({ start }: { start: string }) {
                   <button type="button" aria-expanded={keyFor === c.n} onClick={() => setKeyFor(keyFor === c.n ? null : c.n)} className="btn-soft !py-1 text-xs shrink-0"><HelpCircle size={14} /> Key</button>
                 </div>
                 {keyFor === c.n && (
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-2xl bg-card-2 p-3 mb-3 text-xs text-muted">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-2xl border border-line p-3 mb-3 text-xs text-muted">
                     {[['done', 'Standard walk'], ['modified', 'Modified walk'], ['recovery', 'Recovery'], ['frozen', 'Streak freeze'], ['missed', 'Unlogged'], ['today', 'Today'], ['upcoming', 'Upcoming']].map(([k, l]) => (
                       <span key={k} className="inline-flex items-center gap-1.5"><span className={clsx('size-4 rounded-md inline-block shrink-0', dot[k])} />{l}</span>
                     ))}
