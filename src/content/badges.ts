@@ -1,5 +1,6 @@
 import type { Stats } from '@/lib/stats'
 import { TOP_LEVEL } from '@/lib/xp'
+import { FREEZES_PER_CHAPTER } from '@/lib/stats'
 
 export interface BadgeDef {
   id: string
@@ -14,6 +15,7 @@ export interface BadgeDef {
 export const BADGES: BadgeDef[] = [
   // milestones (by challenge day reached with an active log that day or later)
   { id: 'first-steps', name: 'First Steps', emoji: '👟', desc: 'Complete Day 1.', group: 'milestone', check: (s) => s.workouts >= 1 || s.daysLogged >= 1 },
+  { id: 'week-one', name: 'Week One', emoji: '📅', desc: 'Reach Day 7.', group: 'milestone', check: (s) => s.currentDay >= 7 && s.daysLogged >= 3 },
   { id: 'committed', name: 'Committed', emoji: '💍', desc: 'Reach Day 15.', group: 'milestone', check: (s) => s.currentDay >= 15 && s.daysLogged >= 8 },
   { id: 'consistency-queen', name: 'Consistency Queen', emoji: '👑', desc: 'Reach Day 30 with 15+ active days.', group: 'milestone', check: (s) => s.currentDay >= 30 && s.daysLogged >= 15 },
   { id: 'halfway-hero', name: 'Halfway Hero', emoji: '🦋', desc: 'Reach Day 45.', group: 'milestone', check: (s) => s.currentDay >= 45 && s.daysLogged >= 20 },
@@ -26,6 +28,7 @@ export const BADGES: BadgeDef[] = [
   { id: 'w50', name: 'Fifty & Fabulous', emoji: '💎', desc: 'Complete 50 workouts.', group: 'workouts', check: (s) => s.workouts >= 50 },
   { id: 'w75', name: 'Unstoppable', emoji: '🚀', desc: 'Complete 75 workouts.', group: 'workouts', check: (s) => s.workouts >= 75 },
   { id: 'full-90', name: 'The Full Era', emoji: '🌟', desc: 'Complete the whole challenge with 60+ workouts.', group: 'workouts', check: (s) => s.currentDay >= 90 && s.workouts >= 60 },
+  { id: 'perfect-week', name: 'Perfect Week', emoji: '🌈', desc: 'Complete 5 walks in one challenge week.', group: 'workouts', check: (s) => s.weekly.some((w) => w.workouts >= 5) },
   { id: 'strength-1', name: 'Strong Start', emoji: '💪', desc: 'Complete your first strength session.', group: 'workouts', check: (s) => s.strengthSessions >= 1 },
   { id: 'strength-10', name: 'Iron Butterfly', emoji: '🦋', desc: 'Complete 10 strength sessions.', group: 'workouts', check: (s) => s.strengthSessions >= 10 },
   { id: 'minutes-500', name: '500 Minutes', emoji: '⏱️', desc: 'Walk 500 total minutes.', group: 'workouts', check: (s) => s.walkingMinutes >= 500 },
@@ -35,10 +38,13 @@ export const BADGES: BadgeDef[] = [
   { id: 'boss-5', name: 'Raid Leader', emoji: '🛡️', desc: 'Defeat 5 weekly bosses.', group: 'habits', check: (s) => s.bossesDefeated >= 5 },
   { id: 'streak-7', name: 'Seven Straight', emoji: '🔥', desc: 'Keep a 7-day active streak.', group: 'habits', check: (s) => s.bestStreak >= 7 },
   { id: 'streak-14', name: 'Two-Week Flame', emoji: '🔥', desc: 'Keep a 14-day active streak.', group: 'habits', check: (s) => s.bestStreak >= 14 },
+  { id: 'streak-30', name: 'Month of Momentum', emoji: '🌕', desc: 'Keep a 30-day active streak.', group: 'habits', check: (s) => s.bestStreak >= 30 },
   { id: 'selfcare-10', name: 'Soft Life', emoji: '🛁', desc: 'Complete 10 self-care missions.', group: 'habits', check: (s) => s.selfCareQuests >= 10 },
   { id: 'hydration-20', name: 'Hydration Hero', emoji: '💧', desc: 'Complete the hydration check-in 20 times.', group: 'habits', check: (s) => (s.questCounts['hydrate'] || 0) >= 20 },
   { id: 'journal-10', name: 'Dear Diary', emoji: '📓', desc: 'Write 10 journal entries.', group: 'habits', check: (s) => s.journalEntries >= 10 },
   { id: 'quests-50', name: 'Quest Collector', emoji: '🗺️', desc: 'Complete 50 daily quests.', group: 'habits', check: (s) => s.questsCompleted >= 50 },
+  { id: 'quests-100', name: 'Quest Master', emoji: '🏅', desc: 'Complete 100 daily quests.', group: 'habits', check: (s) => s.questsCompleted >= 100 },
+  { id: 'bonus-10', name: 'Bonus Hunter', emoji: '🧭', desc: 'Complete 10 bonus missions from the wheel.', group: 'habits', check: (s) => s.bonusMissions >= 10 },
   { id: 'reflect-4', name: 'Deep Thinker', emoji: '🪞', desc: 'Complete 4 weekly reflections.', group: 'habits', check: (s) => s.reflections >= 4 },
   { id: 'recovery-3', name: 'Rest Is Productive', emoji: '🌿', desc: 'Log 3 planned recovery days.', group: 'habits', check: (s) => s.recoveryDays >= 3 },
   { id: 'steps-10', name: 'On Your Feet', emoji: '👣', desc: 'Reach your daily step goal on 10 days.', group: 'habits', check: (s) => s.steps.goalDays >= 10 },
@@ -46,6 +52,9 @@ export const BADGES: BadgeDef[] = [
   // hidden
   { id: 'night-owl', name: 'Night Owl', emoji: '🦉', desc: 'Complete 5 workouts on night-shift days.', group: 'hidden', hidden: true, check: (s) => s.nightShiftWorkouts >= 5 },
   { id: 'comeback-kid', name: 'Comeback Kid', emoji: '🎯', desc: 'Return with a workout after two or more quiet days.', group: 'hidden', hidden: true, check: (s) => s.comebacks >= 1 },
+  { id: 'every-kind', name: 'Every Kind of Day', emoji: '🌤️', desc: 'Walk on a day shift, a night shift, an elective day and a day off.', group: 'hidden', hidden: true, check: (s) => (['day', 'night', 'elective', 'off'] as const).every((k) => (s.byShift[k]?.walks ?? 0) > 0) },
+  { id: 'never-needed', name: 'Never Needed It', emoji: '🧊', desc: 'Finish a chapter without using its streak freeze.', group: 'hidden', hidden: true, check: (s) => s.daysLogged >= 15 && [30, 60, 90].some((end, i) => s.currentDay > end && (s.freezesLeftByChapter[i] ?? 0) >= FREEZES_PER_CHAPTER) },
+  { id: 'resilient', name: 'Resilient', emoji: '🪴', desc: 'Come back with a workout after quiet days, three times.', group: 'hidden', hidden: true, check: (s) => s.comebacks >= 3 },
   { id: 'first-purchase', name: 'Treat Yourself', emoji: '🛍️', desc: 'Buy your first reward.', group: 'hidden', hidden: true, check: (s) => s.purchases >= 1 },
   { id: 'spin-10', name: 'Wheel of Fortune', emoji: '🎡', desc: 'Spin the mystery wheel 10 times.', group: 'hidden', hidden: true, check: (s) => s.spins >= 10 },
   { id: 'themes-5', name: 'Genre Hopper', emoji: '🎭', desc: 'Walk with 5 different entertainment themes.', group: 'hidden', hidden: true, check: (s) => s.themesUsed.length >= 5 },

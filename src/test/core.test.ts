@@ -914,6 +914,28 @@ describe('bonus XP worked out from what she has logged', () => {
     useStore.getState().checkProgress()
     expect(xpOf('badge:night-owl')).toBe(20)
   })
+  it('the newer badges unlock on the rules they describe', async () => {
+    const { BADGES } = await import('@/content/badges')
+    const stats = (over: Record<string, unknown>) => ({ currentDay: 0, daysLogged: 0, bestStreak: 0, questsCompleted: 0, bonusMissions: 0, comebacks: 0, weekly: [], byShift: {}, freezesLeftByChapter: [1, 1, 1], ...over }) as unknown as Parameters<(typeof BADGES)[number]['check']>[0]
+    const earns = (id: string, over: Record<string, unknown>) => BADGES.find((b) => b.id === id)!.check(stats(over))
+    expect(earns('week-one', { currentDay: 7, daysLogged: 3 })).toBe(true)
+    expect(earns('week-one', { currentDay: 7, daysLogged: 2 })).toBe(false)
+    expect(earns('perfect-week', { weekly: [{ workouts: 4 }, { workouts: 5 }] })).toBe(true)
+    expect(earns('perfect-week', { weekly: [{ workouts: 4 }] })).toBe(false)
+    expect(earns('streak-30', { bestStreak: 30 })).toBe(true)
+    expect(earns('streak-30', { bestStreak: 29 })).toBe(false)
+    expect(earns('quests-100', { questsCompleted: 100 })).toBe(true)
+    expect(earns('bonus-10', { bonusMissions: 9 })).toBe(false)
+    expect(earns('resilient', { comebacks: 3 })).toBe(true)
+    const walks = (n: number) => ({ days: n, walks: n, minutes: 0 })
+    expect(earns('every-kind', { byShift: { day: walks(1), night: walks(1), elective: walks(1), off: walks(1) } })).toBe(true)
+    expect(earns('every-kind', { byShift: { day: walks(1), night: walks(1), elective: walks(1), off: walks(0) } })).toBe(false)
+    // A chapter only counts once it is over, and only when its freeze is still unused.
+    expect(earns('never-needed', { currentDay: 20, daysLogged: 20, freezesLeftByChapter: [1, 1, 1] })).toBe(false)
+    expect(earns('never-needed', { currentDay: 31, daysLogged: 20, freezesLeftByChapter: [1, 1, 1] })).toBe(true)
+    expect(earns('never-needed', { currentDay: 31, daysLogged: 20, freezesLeftByChapter: [0, 1, 1] })).toBe(false)
+    expect(earns('never-needed', { currentDay: 31, daysLogged: 5, freezesLeftByChapter: [1, 1, 1] })).toBe(false)
+  })
   it('a journal entry pays 5 when it has real writing and was written on its day or the day after', () => {
     const today = todayKeyForTest()
     fresh(addDays(today, -10))
