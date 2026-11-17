@@ -58,12 +58,12 @@ export function XpPanel() {
           <>
             <p className="text-sm text-muted mb-3">Earned per challenge week</p>
             <Card>
-              <div className="flex items-end gap-1.5 h-32">
+              <div className="flex items-end gap-1 sm:gap-1.5 h-32">
                 {stats.weekly.map((w) => (
-                  <div key={w.week} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
-                    <div className="text-[10px] text-muted">{w.xp || ''}</div>
+                  <div key={w.week} className="flex-1 min-w-0 flex flex-col items-center gap-1 h-full justify-end">
+                    <div className="text-[9px] sm:text-[10px] text-muted whitespace-nowrap">{w.xp || ''}</div>
                     <div className={clsx('w-full rounded-t-lg bg-gradient-to-t from-lavender-500 to-blush-300 transition-all', w.week === stats.week && 'ring-2 ring-blush-400')} style={{ height: `${Math.max(w.xp ? 6 : 2, (w.xp / maxWeek) * 100)}%` }} />
-                    <div className="text-[10px] text-muted">W{w.week}</div>
+                    <div className="text-[10px] text-muted"><span className="hidden sm:inline">W</span>{w.week}</div>
                   </div>
                 ))}
               </div>
