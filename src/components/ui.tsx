@@ -11,7 +11,7 @@ export function Card({ children, className, onClick }: { children: ReactNode; cl
 export function SectionTitle({ children, action, sub }: { children: ReactNode; action?: ReactNode; sub?: string }) {
   return (
     <div className="flex items-end justify-between gap-3 mb-3">
-      <div>
+      <div className="min-w-0">
         <h2 className="h-display text-xl">{children}</h2>
         {sub && <p className="text-sm text-muted">{sub}</p>}
       </div>

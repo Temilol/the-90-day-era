@@ -11,8 +11,16 @@ import { PageHeader, Card, Stat, SectionTitle, Progress } from '@/components/ui'
 import { Link } from 'react-router-dom'
 import { clsx } from 'clsx'
 
+type Tab = 'walks' | 'activity' | 'habits'
+const TABS: { id: Tab; label: string }[] = [{ id: 'walks', label: 'Walks' }, { id: 'activity', label: 'Activity' }, { id: 'habits', label: 'Habits' }]
+const LAST_TAB = 'era-progress-tab'
+const lastTab = (): Tab => { try { const v = localStorage.getItem(LAST_TAB); return v === 'activity' || v === 'habits' ? v : 'walks' } catch { return 'walks' } }
+
 export default function ProgressPage() {
   const stats = useStats()
+  // The charts are split over three tabs; the stat tiles above and the links below show on all of them.
+  const [tab, setTab] = useState<Tab>(lastTab)
+  const pick = (next: Tab) => { setTab(next); try { localStorage.setItem(LAST_TAB, next) } catch { /* private mode */ } }
   const badges = useStore((s) => s.badges)
   const ws = waterSettings(useStore((s) => s.profile))
   const maxW = Math.max(1, ...stats.weekly.map((w) => w.workouts))
@@ -68,15 +76,19 @@ export default function ProgressPage() {
         <Stat emoji="⭐" label="Milestones" value={`${milestonesHit}/${MILESTONES.length}`} sub={`${Object.keys(badges).length}/${BADGES.length} badges`} />
       </div>
 
-      <section>
+      <div role="tablist" aria-label="Progress sections" className="grid grid-cols-3 gap-1 rounded-full bg-card-2 p-1 text-sm font-semibold">
+        {TABS.map((x) => <button key={x.id} type="button" role="tab" aria-selected={tab === x.id} onClick={() => pick(x.id)} className={clsx('rounded-full py-2 text-center transition', tab === x.id ? 'bg-card shadow-soft text-ink' : 'text-muted')}>{x.label}</button>)}
+      </div>
+
+      <section hidden={tab !== 'walks'}>
         <SectionTitle sub="Workouts per challenge week. Any length counts.">Weekly consistency</SectionTitle>
         <Card>
-          <div className="flex items-end gap-1.5 h-36">
+          <div className="flex items-end gap-1 sm:gap-1.5 h-36">
             {stats.weekly.map((w) => (
-              <div key={w.week} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
+              <div key={w.week} className="flex-1 min-w-0 flex flex-col items-center gap-1 h-full justify-end">
                 <div className="text-[10px] text-muted">{w.workouts || ''}</div>
                 <div className={clsx('w-full rounded-t-lg bg-gradient-to-t from-lavender-500 to-blush-300', w.week === stats.week && 'ring-2 ring-blush-400')} style={{ height: `${Math.max(w.workouts ? 6 : 2, (w.workouts / maxW) * 100)}%` }} />
-                <div className="text-[10px] text-muted">W{w.week}</div>
+                <div className="text-[10px] text-muted" aria-label={`Week ${w.week}`}><span className="hidden sm:inline">W</span>{w.week}</div>
               </div>
             ))}
           </div>
@@ -88,7 +100,7 @@ export default function ProgressPage() {
         </Card>
       </section>
 
-      <section>
+      <section hidden={tab !== 'walks'}>
         <SectionTitle sub="How often you walk on each kind of day.">Walks by shift</SectionTitle>
         <Card className="space-y-3">
           {shiftRows.length === 0 && <p className="text-sm text-muted">Nothing to show yet. <Link to="/shifts" className="text-lavender-600 dark:text-lavender-300 font-medium">Fill in your schedule</Link> and this will show which kind of day is easiest and hardest to walk on.</p>}
@@ -102,8 +114,8 @@ export default function ProgressPage() {
         </Card>
       </section>
 
-      <section>
-        <SectionTitle sub="Only the numbers you typed in from your treadmill or watch. Nothing is estimated." action={cal.daysWithData > 0 ? <div className="grid grid-cols-2 gap-1 rounded-full bg-card-2 p-1 text-xs font-semibold">{([['recent', '2 weeks'], ['all', 'All']] as const).map(([id, label]) => <button key={id} onClick={() => setCalRange(id)} className={clsx('rounded-full px-3 py-1 transition whitespace-nowrap', calRange === id ? 'bg-card shadow-soft text-ink' : 'text-muted')}>{label}</button>)}</div> : undefined}>Calories burned</SectionTitle>
+      <section hidden={tab !== 'activity'}>
+        <SectionTitle sub="Only the numbers you typed in from your treadmill or watch. Nothing is estimated." action={cal.daysWithData > 0 ? <div className="flex gap-1 rounded-full bg-card-2 p-1 text-xs font-semibold shrink-0">{([['recent', '2 weeks'], ['all', 'All']] as const).map(([id, label]) => <button key={id} onClick={() => setCalRange(id)} className={clsx('rounded-full px-3 py-1 transition whitespace-nowrap', calRange === id ? 'bg-card shadow-soft text-ink' : 'text-muted')}>{label}</button>)}</div> : undefined}>Calories burned</SectionTitle>
         <Card>
           {cal.daysWithData === 0 ? (
             <p className="text-sm text-muted">No calories logged yet. After a walk, type in the number your treadmill or watch shows. You can add it to strength sessions and other activities too.</p>
@@ -130,8 +142,8 @@ export default function ProgressPage() {
         </Card>
       </section>
 
-      <section>
-        <SectionTitle sub="Typed in from your watch or phone. Tracked for interest, with no XP." action={st.days > 0 ? <div className="grid grid-cols-2 gap-1 rounded-full bg-card-2 p-1 text-xs font-semibold">{([['recent', '2 weeks'], ['all', 'All']] as const).map(([id, label]) => <button key={id} onClick={() => setStepRange(id)} className={clsx('rounded-full px-3 py-1 transition whitespace-nowrap', stepRange === id ? 'bg-card shadow-soft text-ink' : 'text-muted')}>{label}</button>)}</div> : undefined}>Steps</SectionTitle>
+      <section hidden={tab !== 'activity'}>
+        <SectionTitle sub="Typed in from your watch or phone. Tracked for interest, with no XP." action={st.days > 0 ? <div className="flex gap-1 rounded-full bg-card-2 p-1 text-xs font-semibold shrink-0">{([['recent', '2 weeks'], ['all', 'All']] as const).map(([id, label]) => <button key={id} onClick={() => setStepRange(id)} className={clsx('rounded-full px-3 py-1 transition whitespace-nowrap', stepRange === id ? 'bg-card shadow-soft text-ink' : 'text-muted')}>{label}</button>)}</div> : undefined}>Steps</SectionTitle>
         <Card>
           {st.days === 0 ? (
             <p className="text-sm text-muted">No steps logged yet. On the Today page, type in the count from your watch or phone, under the walk. Your goal is {st.goal.toLocaleString()} a day.</p>
@@ -167,7 +179,7 @@ export default function ProgressPage() {
         </Card>
       </section>
 
-      <section>
+      <section hidden={tab !== 'habits'}>
         <SectionTitle sub="How often each habit got checked off.">Lifestyle habits</SectionTitle>
         <Card className="space-y-3">
           {lifestyle.map(([e, name, n]) => (
