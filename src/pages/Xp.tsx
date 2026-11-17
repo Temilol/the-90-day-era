@@ -1,18 +1,16 @@
+import { useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { useStats } from '@/lib/hooks'
 import { LEVELS, LEVEL_EMOJI, XP } from '@/lib/xp'
-import { formatDate } from '@/lib/dates'
-import { Card, Progress, Ring, SectionTitle, Empty } from '@/components/ui'
+import { dayKeyAt, formatDate } from '@/lib/dates'
+import { Card, Progress, Ring, SectionTitle, Empty, Modal } from '@/components/ui'
 import { clsx } from 'clsx'
+import { ChevronDown } from 'lucide-react'
 import { BONUS } from '@/lib/bonuses'
 import { OwedNote } from '@/components/OwedNote'
 
 export function XpPanel() {
   const stats = useStats()
-  const xp = useStore((s) => s.xp)
-  const purchases = useStore((s) => s.purchases)
-  const history = [...xp.map((e) => ({ at: e.at, date: e.date, amount: e.amount, reason: e.reason })), ...purchases.map((p) => ({ at: p.at, date: p.at.slice(0, 10), amount: -p.cost, reason: `Reward: ${p.name}` }))]
-    .sort((a, b) => b.at.localeCompare(a.at)).slice(0, 60)
   const maxWeek = Math.max(1, ...stats.weekly.map((w) => w.xp))
 
   return (
@@ -81,18 +79,87 @@ export function XpPanel() {
       </section>
 
       <section>
-        <SectionTitle>History</SectionTitle>
-        {history.length === 0 ? <Empty emoji="✨" title="No XP yet" sub="Your first walk starts the ledger." /> : (
-          <Card className="!p-0 divide-y divide-line">
-            {history.map((h, i) => (
-              <div key={i} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                <div><div className="font-medium">{h.reason}</div><div className="text-xs text-muted">{formatDate(h.date)}</div></div>
-                <div className={clsx('font-bold', h.amount > 0 ? 'gradient-text' : 'text-rose-500')}>{h.amount > 0 ? '+' : ''}{h.amount}</div>
-              </div>
-            ))}
-          </Card>
-        )}
+        <XpHistory today={stats.today} />
       </section>
     </div>
+  )
+}
+
+interface HistoryEntry { at: string; date: string; amount: number; reason: string }
+interface DayGroup { date: string; total: number; entries: HistoryEntry[] }
+
+/** Newest first in, one group per day out, in the same order. */
+function groupByDay(list: HistoryEntry[]): DayGroup[] {
+  const groups = new Map<string, DayGroup>()
+  for (const e of list) {
+    const g = groups.get(e.date) ?? { date: e.date, total: 0, entries: [] }
+    g.total += e.amount
+    g.entries.push(e)
+    groups.set(e.date, g)
+  }
+  return [...groups.values()]
+}
+
+const RECENT_DAYS = 7
+
+function XpHistory({ today }: { today: string }) {
+  const xp = useStore((s) => s.xp)
+  const purchases = useStore((s) => s.purchases)
+  // Today starts open, so the newest breakdown is visible straight away.
+  const [open, setOpen] = useState<Set<string>>(() => new Set([today]))
+  const [showAll, setShowAll] = useState(false)
+  const entries: HistoryEntry[] = [
+    ...xp.map((e) => ({ at: e.at, date: e.date, amount: e.amount, reason: e.reason })),
+    ...purchases.map((p) => ({ at: p.at, date: dayKeyAt(new Date(p.at)), amount: -p.cost, reason: `Bought: ${p.name}` })),
+  ].sort((a, b) => b.at.localeCompare(a.at))
+  const days = groupByDay(entries)
+  const toggle = (date: string) => setOpen((s) => { const n = new Set(s); if (n.has(date)) n.delete(date); else n.add(date); return n })
+
+  const anyOpen = days.some((g) => open.has(g.date))
+  // Kept in place (just hidden) when nothing is open, so the list never jumps.
+  const collapseAll = (cls = '') => (
+    <button type="button" disabled={!anyOpen} onClick={() => setOpen(new Set())} className={clsx('text-xs font-medium text-lavender-600 dark:text-lavender-300 shrink-0 disabled:invisible', cls)}>Collapse all</button>
+  )
+
+  if (days.length === 0) return <><SectionTitle>History</SectionTitle><Empty emoji="✨" title="No XP yet" sub="Your first walk starts the ledger." /></>
+
+  const renderDay = (g: DayGroup) => {
+    const isOpen = open.has(g.date)
+    return (
+      <div key={g.date} className="card !p-0 overflow-hidden">
+        <button type="button" aria-expanded={isOpen} onClick={() => toggle(g.date)} className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left">
+          <div className="min-w-0">
+            <div className="text-sm font-medium">{g.date === today ? 'Today · ' : ''}{formatDate(g.date, { weekday: 'short', day: 'numeric', month: 'short' })}</div>
+            <div className="text-xs text-muted">{g.entries.length} {g.entries.length === 1 ? 'entry' : 'entries'}</div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className={clsx('font-bold', g.total > 0 ? 'gradient-text' : 'text-rose-500')}>{g.total > 0 ? '+' : ''}{g.total} XP</span>
+            <ChevronDown size={16} className={clsx('text-muted transition', isOpen && 'rotate-180')} />
+          </div>
+        </button>
+        {isOpen && (
+          <div className="border-t border-line px-4">
+            {g.entries.map((h, i) => (
+              <div key={`${h.at}-${i}`} className="flex items-center justify-between gap-3 py-2 text-sm border-t border-line first:border-t-0">
+                <span className="min-w-0">{h.reason}</span>
+                <span className={clsx('font-semibold shrink-0', h.amount > 0 ? 'gradient-text' : 'text-rose-500')}>{h.amount > 0 ? '+' : ''}{h.amount} XP</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <SectionTitle sub="Tap a day to see what it came from" action={collapseAll()}>History</SectionTitle>
+      <div className="space-y-2">{days.slice(0, RECENT_DAYS).map(renderDay)}</div>
+      {days.length > RECENT_DAYS && <button type="button" className="btn-soft w-full mt-3" onClick={() => setShowAll(true)}>See all history ({days.length} days)</button>}
+      <Modal open={showAll} onClose={() => setShowAll(false)} title="XP history">
+        <div className="flex justify-end mb-2">{collapseAll()}</div>
+        <div className="space-y-2">{days.map(renderDay)}</div>
+      </Modal>
+    </>
   )
 }
