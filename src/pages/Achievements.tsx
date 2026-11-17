@@ -3,7 +3,7 @@ import { clsx } from 'clsx'
 import { motion } from 'framer-motion'
 import { useStore } from '@/store/useStore'
 import { BADGES, type BadgeDef } from '@/content/badges'
-import { PageHeader, Modal, Progress } from '@/components/ui'
+import { Modal, Progress } from '@/components/ui'
 
 const GROUPS: { id: BadgeDef['group']; name: string; sub: string }[] = [
   { id: 'milestone', name: 'Milestones', sub: 'The big days.' },
@@ -12,14 +12,16 @@ const GROUPS: { id: BadgeDef['group']; name: string; sub: string }[] = [
   { id: 'hidden', name: 'Secret badges', sub: 'Revealed when you earn them.' },
 ]
 
-export default function Achievements() {
+export function BadgesPanel() {
   const badges = useStore((s) => s.badges)
   const [sel, setSel] = useState<BadgeDef | null>(null)
   const unlocked = Object.keys(badges).length
   return (
     <div className="space-y-6">
-      <PageHeader title="Achievement Gallery" emoji="🏆" sub={`${unlocked} of ${BADGES.length} unlocked`} />
-      <Progress value={unlocked / BADGES.length} />
+      <div>
+        <p className="text-sm text-muted -mt-2 mb-3">{unlocked} of {BADGES.length} unlocked</p>
+        <Progress value={unlocked / BADGES.length} />
+      </div>
       {GROUPS.map((g) => (
         <section key={g.id}>
           <div className="mb-3"><h2 className="h-display text-xl">{g.name}</h2><p className="text-sm text-muted">{g.sub}</p></div>

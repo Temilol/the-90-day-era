@@ -2,12 +2,12 @@ import { useStore } from '@/store/useStore'
 import { useStats } from '@/lib/hooks'
 import { LEVELS, LEVEL_EMOJI, XP } from '@/lib/xp'
 import { formatDate } from '@/lib/dates'
-import { PageHeader, Card, Progress, Ring, SectionTitle, Empty } from '@/components/ui'
+import { Card, Progress, Ring, SectionTitle, Empty } from '@/components/ui'
 import { clsx } from 'clsx'
 import { BONUS } from '@/lib/bonuses'
 import { OwedNote } from '@/components/OwedNote'
 
-export default function XpPage() {
+export function XpPanel() {
   const stats = useStats()
   const xp = useStore((s) => s.xp)
   const purchases = useStore((s) => s.purchases)
@@ -17,7 +17,7 @@ export default function XpPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="XP & Levels" emoji="✨" sub="Lifetime XP sets your level. Spending XP in the shop never lowers it." />
+      <p className="text-sm text-muted -mt-2">Lifetime XP sets your level. Spending XP in the shop never lowers it.</p>
       <Card className="flex flex-col sm:flex-row items-center gap-6">
         <Ring value={stats.level.progress} size={150} stroke={12}>
           <div className="text-center"><div className="text-[10px] font-bold uppercase tracking-wider text-muted">Level</div><div className="h-display text-4xl gradient-text">{stats.level.level}</div><div className="text-xs font-semibold">{stats.level.title}</div></div>

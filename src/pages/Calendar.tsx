@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { clsx } from 'clsx'
+import { Link, useLocation } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
 import { useStats } from '@/lib/hooks'
 import { dateForDay, formatDate, TOTAL_DAYS, weekOf, addDays } from '@/lib/dates'
@@ -7,17 +8,52 @@ import { CHAPTERS, MILESTONES } from '@/content/chapters'
 import { BOSSES } from '@/content/bosses'
 import { PageHeader, Modal, Card } from '@/components/ui'
 import { ShiftPicker, WorkoutCard, QuestList, SHIFTS } from '@/components/DayPanel'
-import { Link } from 'react-router-dom'
+import { ShiftTracker } from './Shifts'
+
+type Tab = 'days' | 'shifts'
+const TABS: { id: Tab; label: string }[] = [{ id: 'days', label: 'Days' }, { id: 'shifts', label: 'Shifts' }]
+const LAST_TAB = 'era-calendar-tab'
+const lastTab = (): Tab => { try { return localStorage.getItem(LAST_TAB) === 'shifts' ? 'shifts' : 'days' } catch { return 'days' } }
 
 export default function Calendar() {
+  // The tab comes from the link (/calendar#shifts); with no tab, the one she used last.
+  const loc = useLocation()
+  const hash = loc.hash.slice(1)
+  const tab: Tab = hash === 'shifts' || hash === 'days' ? hash : lastTab()
+  useEffect(() => { if (hash) try { localStorage.setItem(LAST_TAB, tab) } catch { /* private mode */ } }, [tab, hash])
+
+  const stats = useStats()
+  const start = stats.startDate
+  const daysToGo = Math.max(0, TOTAL_DAYS - stats.currentDay)
+  const sub = !start ? 'Set a start date in Settings first.'
+    : stats.finished ? 'Era complete.'
+    : stats.started ? `${daysToGo} days until Day 90 · ${formatDate(dateForDay(start, 90), { month: 'long', day: 'numeric' })}`
+    : `Starts ${formatDate(start, { month: 'long', day: 'numeric' })}`
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Calendar" emoji="🗓️" sub={sub} />
+
+      <div role="tablist" aria-label="Calendar sections" className="grid grid-cols-2 gap-1 rounded-full bg-card-2 p-1 text-sm font-semibold -mt-2">
+        {TABS.map((x) => (
+          <Link key={x.id} to={`#${x.id}`} replace role="tab" aria-selected={tab === x.id} className={clsx('rounded-full py-2 text-center transition', tab === x.id ? 'bg-card shadow-soft text-ink' : 'text-muted')}>
+            {x.label}
+          </Link>
+        ))}
+      </div>
+
+      {tab === 'shifts' ? <ShiftTracker /> : start && <DayGrid start={start} />}
+    </div>
+  )
+}
+
+/** The 90 days as coloured squares, in three chapter cards. A tap opens that day. */
+function DayGrid({ start }: { start: string }) {
   const stats = useStats()
   const days = useStore((s) => s.days)
-  const start = stats.startDate
   const [sel, setSel] = useState<number | null>(null)
   const applyFreeze = useStore((s) => s.applyFreeze)
   const removeFreeze = useStore((s) => s.removeFreeze)
-
-  if (!start) return <PageHeader title="90-Day Calendar" emoji="🗓️" sub="Set a start date in Settings first." />
 
   const status = (n: number) => {
     const date = dateForDay(start, n)
@@ -40,12 +76,9 @@ export default function Calendar() {
   }
   const selDate = sel ? dateForDay(start, sel) : null
   const selLog = selDate ? days[selDate] : undefined
-  const daysToGo = Math.max(0, TOTAL_DAYS - stats.currentDay)
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="90-Day Calendar" emoji="🗓️" sub={stats.finished ? 'Era complete.' : stats.started ? `${daysToGo} days until Day 90 · ${formatDate(dateForDay(start, 90), { month: 'long', day: 'numeric' })}` : `Starts ${formatDate(start, { month: 'long', day: 'numeric' })}`} />
-
+    <>
       <div className="flex flex-wrap gap-2 text-xs">
         {[['done', 'Standard walk'], ['modified', 'Modified walk'], ['recovery', 'Recovery'], ['frozen', 'Streak freeze'], ['missed', 'Unlogged'], ['today', 'Today'], ['upcoming', 'Upcoming']].map(([k, l]) => (
           <span key={k} className="inline-flex items-center gap-1.5 text-muted"><span className={clsx('size-4 rounded-md inline-block', dot[k])} />{l}</span>
@@ -118,6 +151,6 @@ export default function Calendar() {
           </div>
         )}
       </Modal>
-    </div>
+    </>
   )
 }

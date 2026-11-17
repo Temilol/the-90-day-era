@@ -103,7 +103,7 @@ export default function ProgressPage() {
       <section hidden={tab !== 'walks'}>
         <SectionTitle sub="How often you walk on each kind of day.">Walks by shift</SectionTitle>
         <Card className="space-y-3">
-          {shiftRows.length === 0 && <p className="text-sm text-muted">Nothing to show yet. <Link to="/shifts" className="text-lavender-600 dark:text-lavender-300 font-medium">Fill in your schedule</Link> and this will show which kind of day is easiest and hardest to walk on.</p>}
+          {shiftRows.length === 0 && <p className="text-sm text-muted">Nothing to show yet. <Link to="/calendar#shifts" className="text-lavender-600 dark:text-lavender-300 font-medium">Fill in your schedule</Link> and this will show which kind of day is easiest and hardest to walk on.</p>}
           {shiftRows.map((r) => (
             <div key={r.id}>
               <div className="flex justify-between gap-3 text-sm"><span>{r.emoji} {r.label}</span><span className="text-muted"><span className="font-semibold text-ink">{r.walks} of {r.days}</span> {r.days === 1 ? 'day' : 'days'} · {Math.round(r.rate * 100)}%{r.walks ? ` · avg ${Math.round(r.minutes / r.walks)} min` : ''}</span></div>
@@ -191,7 +191,7 @@ export default function ProgressPage() {
 
       <div className="grid sm:grid-cols-2 gap-3">
         <Link to="/weight" className="card p-4 hover:shadow-glow transition"><div className="font-semibold">⚖️ Weight & non-scale victories</div><div className="text-xs text-muted">{stats.weights} weigh-ins · {stats.nsvs} victories recorded</div></Link>
-        <Link to="/achievements" className="card p-4 hover:shadow-glow transition"><div className="font-semibold">🏆 Achievement gallery</div><div className="text-xs text-muted">{Object.keys(badges).length} badges unlocked</div></Link>
+        <Link to="/rewards#badges" className="card p-4 hover:shadow-glow transition"><div className="font-semibold">🏆 Achievement gallery</div><div className="text-xs text-muted">{Object.keys(badges).length} badges unlocked</div></Link>
       </div>
     </div>
   )

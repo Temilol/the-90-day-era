@@ -13,13 +13,10 @@ import Today from './pages/Today'
 const Calendar = lazy(() => import('./pages/Calendar'))
 const Bosses = lazy(() => import('./pages/Bosses'))
 const Mystery = lazy(() => import('./pages/Mystery'))
-const XpPage = lazy(() => import('./pages/Xp'))
-const Achievements = lazy(() => import('./pages/Achievements'))
-const Shop = lazy(() => import('./pages/Shop'))
+const Rewards = lazy(() => import('./pages/Rewards'))
 const Progress = lazy(() => import('./pages/Progress'))
 const Weight = lazy(() => import('./pages/Weight'))
 const Journal = lazy(() => import('./pages/Journal'))
-const Shifts = lazy(() => import('./pages/Shifts'))
 const SettingsPage = lazy(() => import('./pages/Settings'))
 
 export default function App() {
@@ -40,13 +37,14 @@ function Screens() {
         <Route path="calendar" element={<Calendar />} />
         <Route path="bosses" element={<Bosses />} />
         <Route path="mystery" element={<Mystery />} />
-        <Route path="xp" element={<XpPage />} />
-        <Route path="achievements" element={<Achievements />} />
-        <Route path="shop" element={<Shop />} />
+        <Route path="rewards" element={<Rewards />} />
+        <Route path="xp" element={<Navigate to="/rewards#xp" replace />} />
+        <Route path="achievements" element={<Navigate to="/rewards#badges" replace />} />
+        <Route path="shop" element={<Navigate to="/rewards#shop" replace />} />
         <Route path="progress" element={<Progress />} />
         <Route path="weight" element={<Weight />} />
         <Route path="journal" element={<Journal />} />
-        <Route path="shifts" element={<Shifts />} />
+        <Route path="shifts" element={<Navigate to="/calendar#shifts" replace />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="settings/:section" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

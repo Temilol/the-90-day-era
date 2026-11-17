@@ -5,7 +5,7 @@ import { prizeDef } from '@/content/envelopes'
 import { todayKey } from '@/lib/dates'
 import { useStore } from '@/store/useStore'
 import { useStats } from '@/lib/hooks'
-import { PageHeader, Card, Modal, Progress, SectionTitle, Empty, confirmDialog } from '@/components/ui'
+import { Card, Modal, Progress, SectionTitle, Empty, confirmDialog } from '@/components/ui'
 import { burst } from '@/components/Celebrate'
 import { Pencil, Plus, Trash2, ImagePlus, ExternalLink, X } from 'lucide-react'
 import { XP } from '@/lib/xp'
@@ -13,7 +13,7 @@ import { useRef } from 'react'
 import type { Reward } from '@/lib/types'
 import { OwedNote } from '@/components/OwedNote'
 
-export default function Shop() {
+export function ShopPanel() {
   const stats = useStats()
   const rewards = useStore((s) => s.rewards)
   const purchases = useStore((s) => s.purchases)
@@ -54,7 +54,10 @@ export default function Shop() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Reward Shop" emoji="🛍️" sub="Spend XP on real-life treats. Add a photo or link so you can see what you’re walking toward." action={<button className="btn-soft" onClick={() => setEdit({ emoji: '🎁', cost: 150 })}><Plus size={16} /> Add</button>} />
+      <div className="flex items-start justify-between gap-3 -mt-2">
+        <p className="text-sm text-muted min-w-0">Spend XP on real-life treats. Add a photo or link so you can see what you’re walking toward.</p>
+        <button className="btn-soft shrink-0" onClick={() => setEdit({ emoji: '🎁', cost: 150 })}><Plus size={16} /> Add</button>
+      </div>
       <Card className="flex items-center gap-4 bg-gradient-to-br from-lavender-50 to-blush-50 dark:from-lavender-500/15 dark:to-blush-500/10">
         <div className="text-4xl">💎</div>
         <div className="flex-1 min-w-0"><div className="text-xs font-bold uppercase tracking-wider text-muted">Balance</div><div className="h-display text-3xl gradient-text">{stats.balanceXp} XP</div><div className="text-xs text-muted">{stats.spentXp} spent · {stats.lifetimeXp} earned</div><OwedNote owed={stats.owedXp} /></div>

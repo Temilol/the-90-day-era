@@ -174,7 +174,7 @@ export function MyRewards() {
                 <div className="text-xs text-muted break-words">{status}</div>
               </div>
               {!used && kind === 'freeze' && <Link to="/calendar" className={linkClass}>Use</Link>}
-              {!used && kind === 'discount' && <Link to="/shop" className={linkClass}>Use in shop</Link>}
+              {!used && kind === 'discount' && <Link to="/rewards#shop" className={linkClass}>Use in shop</Link>}
               {!used && kind === 'swap' && <Link to="/today" className={linkClass}>Use today</Link>}
               {!used && kind === 'double' && <button className={linkClass} disabled={!stats.started || stats.finished} onClick={() => { redeemPrize(p.id); hearts() }}>Use today</button>}
               {(kind === 'treat' || kind === 'mission') && <button className={used ? 'btn-ghost !py-1.5 text-xs shrink-0 whitespace-nowrap' : linkClass} onClick={() => { redeemPrize(p.id); if (!used) hearts() }}>{used ? 'Undo' : 'Mark done'}</button>}

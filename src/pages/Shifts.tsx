@@ -6,7 +6,7 @@ import { planFill, MAX_FILL_DAYS } from '@/lib/schedule'
 import { DEFAULT_ELECTIVE } from '@/lib/walkPlan'
 import { useUi } from '@/store/ui'
 import { SHIFTS } from '@/components/DayPanel'
-import { PageHeader, Card, Modal } from '@/components/ui'
+import { Card, Modal } from '@/components/ui'
 import { ReminderInvite } from '@/components/Notifications'
 import type { ShiftHours, ShiftType } from '@/lib/types'
 import { CalendarRange, X } from 'lucide-react'
@@ -100,7 +100,8 @@ function ScheduleFill({ open, onClose }: { open: boolean; onClose: () => void })
   )
 }
 
-export default function Shifts() {
+/** The Shift Tracker, shown as the Shifts tab of the Calendar. */
+export function ShiftTracker() {
   const days = useStore((s) => s.days)
   const setShift = useStore((s) => s.setShift)
   const setShiftHours = useStore((s) => s.setShiftHours)
@@ -113,7 +114,10 @@ export default function Shifts() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Shift Tracker" emoji="🕑" sub="Fill in your schedule once, then change any single day with a tap." action={<button className="btn-primary whitespace-nowrap" onClick={() => setFillOpen(true)}><CalendarRange size={16} /> Fill in</button>} />
+      <div className="flex items-start justify-between gap-3 -mt-2">
+        <p className="text-sm text-muted min-w-0">Fill in your schedule once, then change any single day with a tap.</p>
+        <button className="btn-primary whitespace-nowrap shrink-0" onClick={() => setFillOpen(true)}><CalendarRange size={16} /> Fill in</button>
+      </div>
       <ScheduleFill key={fillOpen ? 'open' : 'closed'} open={fillOpen} onClose={() => setFillOpen(false)} />
       <Card>
         <div className="flex items-center justify-between mb-3">

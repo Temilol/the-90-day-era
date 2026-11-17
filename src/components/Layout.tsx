@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Home, Target, CalendarDays, Swords, Sparkles, Trophy, ShoppingBag, Gift, BarChart3, Scale, BookHeart, Clock, Settings, LayoutGrid, X } from 'lucide-react'
+import { Home, Target, CalendarDays, Swords, Trophy, Gift, BarChart3, Scale, BookHeart, Settings, LayoutGrid, X } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -14,16 +14,13 @@ import { ResetPrompt } from './DayReset'
 export const NAV = [
   { to: '/', label: 'Home', icon: Home, end: true },
   { to: '/today', label: 'Today’s Mission', icon: Target },
-  { to: '/calendar', label: '90-Day Calendar', icon: CalendarDays },
+  { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/bosses', label: 'Boss Battles', icon: Swords },
   { to: '/mystery', label: 'Mystery Missions', icon: Gift },
-  { to: '/xp', label: 'XP & Levels', icon: Sparkles },
-  { to: '/achievements', label: 'Achievements', icon: Trophy },
-  { to: '/shop', label: 'Reward Shop', icon: ShoppingBag },
+  { to: '/rewards', label: 'Rewards', icon: Trophy },
   { to: '/progress', label: 'Progress & Stats', icon: BarChart3 },
   { to: '/weight', label: 'Weight & Wins', icon: Scale },
   { to: '/journal', label: 'Journal', icon: BookHeart },
-  { to: '/shifts', label: 'Shift Tracker', icon: Clock },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 const MOBILE_MAIN = ['/', '/today', '/calendar', '/bosses']

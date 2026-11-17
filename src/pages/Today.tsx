@@ -55,7 +55,7 @@ export default function Today() {
         </div>
       ) : (
         <section>
-          <SectionTitle sub="Your shift sets today’s walk plan and shapes one of your quests." action={<Link to="/shifts" className="btn-soft !py-1.5 text-xs">Fill in schedule</Link>}>What kind of day is it?</SectionTitle>
+          <SectionTitle sub="Your shift sets today’s walk plan and shapes one of your quests." action={<Link to="/calendar#shifts" className="btn-soft !py-1.5 text-xs">Fill in schedule</Link>}>What kind of day is it?</SectionTitle>
           <ShiftPicker date={today} />
           {shiftDef && <button className="btn-soft w-full mt-3" onClick={() => setPickShift(false)}>Done</button>}
         </section>

@@ -68,7 +68,7 @@ export default function Dashboard() {
           <h1 className="h-display text-3xl sm:text-4xl">{stats.finished ? 'You finished your era.' : `Day ${stats.displayDay} of ${TOTAL_DAYS}`}</h1>
           <div className="text-sm text-muted">{formatDate(today, { weekday: 'long', month: 'long', day: 'numeric' })} · {chapter.emoji} Chapter {chapter.n}: {chapter.name}</div>
         </div>
-        <Link to="/xp" className="card px-4 py-2 text-center shrink-0">
+        <Link to="/rewards#xp" className="card px-4 py-2 text-center shrink-0">
           <div className="text-[10px] font-bold uppercase tracking-wider text-muted">Level {stats.level.level}</div>
           <div className="font-semibold gradient-text leading-tight">{stats.level.title}</div>
         </Link>
@@ -149,7 +149,7 @@ export default function Dashboard() {
           </Link>
         )}
         {stats.started && !stats.finished && (
-          <Link to="/shifts" className="flex items-center gap-3 px-4 py-3.5 hover:bg-card-2 transition">
+          <Link to="/calendar#shifts" className="flex items-center gap-3 px-4 py-3.5 hover:bg-card-2 transition">
             <span className="text-2xl leading-none shrink-0">{tomorrow?.shift ? SHIFTS.find((x) => x.id === tomorrow.shift)?.emoji : '📅'}</span>
             <div className="flex-1 min-w-0">
               {tomorrow?.shift
@@ -176,8 +176,8 @@ export default function Dashboard() {
           { to: '/mystery', icon: Gift, label: 'Mystery', badge: unopened },
           { to: '/calendar', icon: CalendarDays, label: 'Calendar' },
           { to: '/journal', icon: BookHeart, label: 'Journal' },
-          { to: '/shop', icon: ShoppingBag, label: 'Shop' },
-          { to: '/achievements', icon: Trophy, label: 'Badges' },
+          { to: '/rewards#shop', icon: ShoppingBag, label: 'Shop' },
+          { to: '/rewards#badges', icon: Trophy, label: 'Badges' },
           { to: '/bosses', icon: Swords, label: 'Bosses' },
         ].map((q) => (
           <Link key={q.to} to={q.to} className="card p-3 flex flex-col items-center gap-1.5 text-xs font-medium relative hover:shadow-glow transition">
@@ -244,8 +244,8 @@ function PreStart() {
       <Card>
         <div className="font-semibold mb-2">While you wait</div>
         <ul className="text-sm text-muted space-y-1.5 list-disc pl-5">
-          <li>Set up your <Link to="/shop" className="text-lavender-600 dark:text-lavender-300 font-medium">reward shop</Link> with prizes you actually want.</li>
-          <li>Log your upcoming shifts in the <Link to="/shifts" className="text-lavender-600 dark:text-lavender-300 font-medium">shift tracker</Link> so reminders know when to nudge you.</li>
+          <li>Set up your <Link to="/rewards#shop" className="text-lavender-600 dark:text-lavender-300 font-medium">reward shop</Link> with prizes you actually want.</li>
+          <li>Log your upcoming shifts in the <Link to="/calendar#shifts" className="text-lavender-600 dark:text-lavender-300 font-medium">shift tracker</Link> so reminders know when to nudge you.</li>
           <li>Change the start date any time in <Link to="/settings/account" className="text-lavender-600 dark:text-lavender-300 font-medium">Settings</Link>.</li>
         </ul>
       </Card>
