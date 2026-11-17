@@ -5,13 +5,15 @@ import { LEVELS, LEVEL_EMOJI, XP } from '@/lib/xp'
 import { dayKeyAt, formatDate } from '@/lib/dates'
 import { Card, Progress, Ring, SectionTitle, Empty, Modal } from '@/components/ui'
 import { clsx } from 'clsx'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, ChevronRight, HelpCircle } from 'lucide-react'
 import { BONUS } from '@/lib/bonuses'
 import { OwedNote } from '@/components/OwedNote'
 
 export function XpPanel() {
   const stats = useStats()
   const maxWeek = Math.max(1, ...stats.weekly.map((w) => w.xp))
+  const [view, setView] = useState<'ladder' | 'weekly'>('ladder')
+  const [rules, setRules] = useState(false)
 
   return (
     <div className="space-y-6">
@@ -31,52 +33,62 @@ export function XpPanel() {
         </div>
       </Card>
 
-      <section>
-        <SectionTitle>Level ladder</SectionTitle>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-          {LEVELS.map((l) => (
-            <div key={l.level} className={clsx('card p-3 text-center', stats.level.level === l.level && 'ring-2 ring-lavender-400', stats.lifetimeXp < l.xp && 'opacity-60')}>
-              <div className="text-2xl">{LEVEL_EMOJI[l.level - 1]}</div>
-              <div className="font-semibold text-sm">{l.title}</div>
-              <div className="text-xs text-muted">{l.xp} XP</div>
-            </div>
-          ))}
-        </div>
-      </section>
+      <button type="button" onClick={() => setRules(true)} className="card w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:shadow-glow transition">
+        <span className="flex items-center gap-2 text-sm font-semibold"><HelpCircle size={18} className="text-lavender-500 shrink-0" />How do I earn XP?</span>
+        <ChevronRight size={16} className="text-lavender-400 shrink-0" />
+      </button>
 
       <section>
-        <SectionTitle sub="Earned per challenge week">Weekly XP</SectionTitle>
-        <Card>
-          <div className="flex items-end gap-1.5 h-32">
-            {stats.weekly.map((w) => (
-              <div key={w.week} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
-                <div className="text-[10px] text-muted">{w.xp || ''}</div>
-                <div className={clsx('w-full rounded-t-lg bg-gradient-to-t from-lavender-500 to-blush-300 transition-all', w.week === stats.week && 'ring-2 ring-blush-400')} style={{ height: `${Math.max(w.xp ? 6 : 2, (w.xp / maxWeek) * 100)}%` }} />
-                <div className="text-[10px] text-muted">W{w.week}</div>
+        <div role="tablist" aria-label="Level ladder or weekly XP" className="grid grid-cols-2 gap-1 rounded-full bg-card-2 p-1 text-sm font-semibold mb-3">
+          {([['ladder', 'Ladder'], ['weekly', 'Weekly XP']] as const).map(([id, label]) => (
+            <button key={id} type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)} className={clsx('rounded-full py-2 text-center transition', view === id ? 'bg-card shadow-soft text-ink' : 'text-muted')}>{label}</button>
+          ))}
+        </div>
+        {view === 'ladder' ? (
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            {LEVELS.map((l) => (
+              <div key={l.level} className={clsx('card p-3 text-center', stats.level.level === l.level && 'ring-2 ring-lavender-400', stats.lifetimeXp < l.xp && 'opacity-60')}>
+                <div className="text-2xl">{LEVEL_EMOJI[l.level - 1]}</div>
+                <div className="font-semibold text-sm">{l.title}</div>
+                <div className="text-xs text-muted">{l.xp} XP</div>
               </div>
             ))}
           </div>
-        </Card>
+        ) : (
+          <>
+            <p className="text-sm text-muted mb-3">Earned per challenge week</p>
+            <Card>
+              <div className="flex items-end gap-1.5 h-32">
+                {stats.weekly.map((w) => (
+                  <div key={w.week} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
+                    <div className="text-[10px] text-muted">{w.xp || ''}</div>
+                    <div className={clsx('w-full rounded-t-lg bg-gradient-to-t from-lavender-500 to-blush-300 transition-all', w.week === stats.week && 'ring-2 ring-blush-400')} style={{ height: `${Math.max(w.xp ? 6 : 2, (w.xp / maxWeek) * 100)}%` }} />
+                    <div className="text-[10px] text-muted">W{w.week}</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </>
+        )}
       </section>
 
-      <section>
-        <SectionTitle>How XP works</SectionTitle>
-        <Card className="text-sm">
-          <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
-            {[['5–10 min modified walk', XP.walkShort], ['11–20 min modified walk', XP.walkMedium], ['21–30 min walk', XP.walkFull], ['Walk longer than 30 min', XP.walkLong], ['Bonus for any walk on a day or night shift', XP.shiftBonus], ['Other activities adding up to 30+ minutes, once a day', XP.activity], ['10-minute strength session', XP.strength], ['Weekly boss battle', XP.boss], ['Weekly reflection', XP.reflection], ['Planned recovery day', XP.recovery], ['Daily quest', XP.quest], ['Bonus mission from the wheel', XP.bonusMission]].map(([k, v]) => (
-              <div key={k as string} className="flex justify-between gap-3 border-b border-line py-1.5"><span className="text-muted min-w-0">{k}</span><span className="font-semibold shrink-0 whitespace-nowrap">+{v} XP</span></div>
-            ))}
-          </div>
-          <p className="text-xs text-muted mt-3">One workout reward per day. Editing a workout replaces its XP instead of stacking it.</p>
-          <div className="label mt-5">Bonuses</div>
-          <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
-            {([['Streak of 3, 7, 14, 21, 30, 45, 60 and 90 days, once each', `+${Object.values(BONUS.streak)[0]} to +${Object.values(BONUS.streak).slice(-1)[0]}`], ['Five treadmill walks in a challenge week', `+${BONUS.weekWalks}`], ['All four quests in a day', `+${BONUS.fullQuests}`], ['Each badge (hidden ones pay double)', `+${BONUS.badge}`], ['Journal entry, written that day or the next', `+${BONUS.journal}`], ['Weigh-in or progress photo, once a week', `+${BONUS.checkIn}`], ['Non-scale victory, once a week', `+${BONUS.nsv}`], ['Sealing your time capsule', `+${BONUS.capsule}`]] as const).map(([k, v]) => (
-              <div key={k} className="flex justify-between gap-3 border-b border-line py-1.5"><span className="text-muted min-w-0">{k}</span><span className="font-semibold shrink-0 whitespace-nowrap">{v} XP</span></div>
-            ))}
-          </div>
-          <p className="text-xs text-muted mt-3">Bonuses follow what you’ve logged. If something they depend on is removed, the bonus goes with it.</p>
-        </Card>
-      </section>
+      <Modal open={rules} onClose={() => setRules(false)} wide title="How XP works">
+        <div className="text-sm">
+            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
+              {[['5–10 min modified walk', XP.walkShort], ['11–20 min modified walk', XP.walkMedium], ['21–30 min walk', XP.walkFull], ['Walk longer than 30 min', XP.walkLong], ['Bonus for any walk on a day or night shift', XP.shiftBonus], ['Other activities adding up to 30+ minutes, once a day', XP.activity], ['10-minute strength session', XP.strength], ['Weekly boss battle', XP.boss], ['Weekly reflection', XP.reflection], ['Planned recovery day', XP.recovery], ['Daily quest', XP.quest], ['Bonus mission from the wheel', XP.bonusMission]].map(([k, v]) => (
+                <div key={k as string} className="flex justify-between gap-3 border-b border-line py-1.5"><span className="text-muted min-w-0">{k}</span><span className="font-semibold shrink-0 whitespace-nowrap">+{v} XP</span></div>
+              ))}
+            </div>
+            <p className="text-xs text-muted mt-3">One workout reward per day. Editing a workout replaces its XP instead of stacking it.</p>
+            <div className="label mt-5">Bonuses</div>
+            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
+              {([['Streak of 3, 7, 14, 21, 30, 45, 60 and 90 days, once each', `+${Object.values(BONUS.streak)[0]} to +${Object.values(BONUS.streak).slice(-1)[0]}`], ['Five treadmill walks in a challenge week', `+${BONUS.weekWalks}`], ['All four quests in a day', `+${BONUS.fullQuests}`], ['Each badge (hidden ones pay double)', `+${BONUS.badge}`], ['Journal entry, written that day or the next', `+${BONUS.journal}`], ['Weigh-in or progress photo, once a week', `+${BONUS.checkIn}`], ['Non-scale victory, once a week', `+${BONUS.nsv}`], ['Sealing your time capsule', `+${BONUS.capsule}`]] as const).map(([k, v]) => (
+                <div key={k} className="flex justify-between gap-3 border-b border-line py-1.5"><span className="text-muted min-w-0">{k}</span><span className="font-semibold shrink-0 whitespace-nowrap">{v} XP</span></div>
+              ))}
+            </div>
+            <p className="text-xs text-muted mt-3">Bonuses follow what you’ve logged. If something they depend on is removed, the bonus goes with it.</p>
+        </div>
+      </Modal>
 
       <section>
         <XpHistory today={stats.today} />
