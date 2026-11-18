@@ -47,6 +47,12 @@ export function nextEnvelope(stats: Stats, envelopes: Record<string, Envelope>):
     } else if (t.type === 'workouts') {
       distance = t.value - stats.workouts
       need = plural(distance, 'walk')
+    } else if (t.type === 'strength') {
+      distance = t.value - stats.strengthSessions
+      need = plural(distance, 'strength session')
+    } else if (t.type === 'bosses') {
+      distance = t.value - stats.bossesDefeated
+      need = plural(distance, 'boss defeat')
     } else {
       distance = t.value - stats.streak
       need = `${plural(distance, 'day')} in a row`

@@ -540,6 +540,8 @@ export const useStore = create<Store>()(
             const t = e.trigger
             if (t.type === 'day') return stats.currentDay >= t.value && stats.daysLogged >= Math.ceil(t.value / 3)
             if (t.type === 'workouts') return stats.workouts >= t.value
+            if (t.type === 'strength') return stats.strengthSessions >= t.value
+            if (t.type === 'bosses') return stats.bossesDefeated >= t.value
             if (t.type === 'secret') return stats.secrets[t.key]
             return stats.bestStreak >= t.value
           })

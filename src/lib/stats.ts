@@ -1,7 +1,9 @@
 import type { DayLog, EraState, ShiftType } from './types'
 import { TOTAL_DAYS, addDays, dayNumber, dateForDay, todayKey, weekOf, chapterOf, parseKey } from './dates'
 import { levelFor, stepGoalOf, ACTIVITY_MIN_MINUTES } from './xp'
-import { journalLength } from './journal'
+import { journalLength, journalEarns, JOURNAL_MIN_CHARS } from './journal'
+import { waterSettings, goalMet } from './water'
+import { THEMES } from '@/content/themes'
 import { SELF_CARE_IDS } from '@/content/quests'
 import { BOSSES } from '@/content/bosses'
 import type { SecretKey } from '@/content/envelopes'
@@ -77,7 +79,7 @@ export function isPerfectDay(d: DayLog): boolean {
     && (d.strength?.minutes ?? 0) >= 5
     && (d.activities ?? []).reduce((n, a) => n + (a.minutes || 0), 0) >= ACTIVITY_MIN_MINUTES
     && !!d.bonusMission?.done
-    && journalLength(d.journal) >= 20
+    && journalLength(d.journal) >= JOURNAL_MIN_CHARS
     && Object.keys(d.quests || {}).length >= 4
 }
 
@@ -215,10 +217,25 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
 
   // Secret envelopes. Nothing in the app hints at these.
   const walked = (d: DayLog) => !!d.workout && d.workout.minutes >= 5
+  const goalMl = waterSettings(s.profile).goalMl
+  /** The longest run of challenge days in a row that all pass the test. */
+  const longestRun = (start: string | null, test: (d: DayLog | undefined) => boolean) => {
+    if (!start) return 0
+    let best = 0, run = 0
+    for (let n = 1; n <= TOTAL_DAYS; n++) { if (test(s.days[dateForDay(start, n)])) best = Math.max(best, ++run); else run = 0 }
+    return best
+  }
   const secrets: Stats['secrets'] = {
     showedUp: logs.some((d) => walked(d) && d.workout!.minutes < 20 && (d.shift === 'day' || d.shift === 'night')),
     restWalk: logs.some((d) => walked(d) && d.shift === 'recovery'),
     perfectDay: logs.some(isPerfectDay),
+    nightShiftHero: logs.some((d) => d.shift === 'night' && (d.workout?.minutes ?? 0) >= 30),
+    hydrationHero: longestRun(startDate, (d) => goalMet(d?.water, goalMl)) >= 7,
+    dearDiary: longestRun(startDate, (d) => !!d && journalEarns(d)) >= 7,
+    themeExplorer: THEMES.every((t) => themesUsed.includes(t.id)),
+    fifteenThousand: logs.some((d) => (d.steps ?? 0) >= 15000),
+    // Every day of a chapter has a walk or a planned recovery day. A streak freeze does not count.
+    perfectChapter: !!startDate && [1, 2, 3].some((c) => Array.from({ length: 30 }, (_, i) => dateForDay(startDate, (c - 1) * 30 + i + 1)).every((date) => isActiveDay(s.days[date]))),
     goingLong: workoutsList.filter((d) => d.workout!.minutes > 30).length >= 10,
     perfectWeek: weekly.some((w) => {
       const boss = BOSSES.find((b) => b.week === w.week)

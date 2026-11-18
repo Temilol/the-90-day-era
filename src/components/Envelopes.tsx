@@ -15,7 +15,7 @@ import { burst, hearts } from './Celebrate'
 const hintFor = (def: EnvelopeDef) => {
   const t = def.trigger
   if (t.type === 'secret') return 'A secret. No hints.'
-  return t.type === 'day' ? `Reach Day ${t.value} with ${Math.ceil(t.value / 3)}+ active days` : t.type === 'workouts' ? `${t.value} workouts` : `${t.value}-day streak`
+  return t.type === 'day' ? `Reach Day ${t.value} with ${Math.ceil(t.value / 3)}+ active days` : t.type === 'workouts' ? `${t.value} workouts` : t.type === 'strength' ? `${t.value} strength sessions` : t.type === 'bosses' ? (t.value === 1 ? 'Defeat your first boss' : `Defeat ${t.value} bosses`) : `${t.value}-day streak`
 }
 
 function TierChip({ tier }: { tier: EnvelopeDef['tier'] }) {

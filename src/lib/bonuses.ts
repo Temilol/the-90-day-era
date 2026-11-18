@@ -1,9 +1,9 @@
 import type { DayLog, EraState } from './types'
 import { chapterStats, isPerfectDay, type Stats } from './stats'
-import { journalLength } from './journal'
+import { journalLength, journalEarns, JOURNAL_MIN_CHARS } from './journal'
 import { waterSettings, goalMet } from './water'
 import { CHAPTERS } from '@/content/chapters'
-import { addDays, dateForDay, dayKeyAt, dayNumber, toKey, weekOf, TOTAL_DAYS } from './dates'
+import { dateForDay, dayNumber, toKey, weekOf, TOTAL_DAYS } from './dates'
 import { BADGES } from '@/content/badges'
 
 /**
@@ -21,7 +21,7 @@ export const BONUS = {
   badge: 10,
   hiddenBadge: 20,
   journal: 5,
-  journalMinChars: 20,
+  journalMinChars: JOURNAL_MIN_CHARS,
   checkIn: 10, // a weigh-in or progress photo, once per challenge week
   nsv: 5, // a non-scale victory, once per challenge week
   capsule: 20,
@@ -42,16 +42,7 @@ const KEPT = ['chapter:', 'comeback:', 'perfect:', 'waterweek:', 'journalweek:',
 export const isBonusId = (id: string) => id === 'capsule' || FOLLOWING.some((p) => id.startsWith(p)) || KEPT.some((p) => id.startsWith(p))
 const isKeptId = (id: string) => KEPT.some((p) => id.startsWith(p))
 
-export { journalLength }
-
-/** A journal entry earns XP when it has real writing in it and was written on its day or the day after. */
-export function journalEarns(d: DayLog): boolean {
-  const j = d.journal
-  if (!j || journalLength(j) < BONUS.journalMinChars) return false
-  const at = new Date(j.qualifiedAt ?? j.updatedAt)
-  if (isNaN(at.getTime())) return false
-  return dayKeyAt(at) <= addDays(d.date, 1)
-}
+export { journalLength, journalEarns }
 
 export function expectedBonuses(s: EraState, stats: Stats): Bonus[] {
   const out: Bonus[] = []

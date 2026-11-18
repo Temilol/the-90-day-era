@@ -1,22 +1,29 @@
 export type Tier = 'common' | 'rare' | 'legendary'
-export type SecretKey = 'showedUp' | 'restWalk' | 'perfectDay' | 'goingLong' | 'perfectWeek'
+export type SecretKey = 'showedUp' | 'restWalk' | 'perfectDay' | 'goingLong' | 'perfectWeek' | 'nightShiftHero' | 'hydrationHero' | 'dearDiary' | 'themeExplorer' | 'fifteenThousand' | 'perfectChapter'
 export interface EnvelopeDef {
   id: string; title: string; tier: Tier
-  trigger: { type: 'day'; value: number } | { type: 'workouts'; value: number } | { type: 'streak'; value: number } | { type: 'secret'; key: SecretKey }
+  trigger: { type: 'day'; value: number } | { type: 'workouts'; value: number } | { type: 'streak'; value: number } | { type: 'strength'; value: number } | { type: 'bosses'; value: number } | { type: 'secret'; key: SecretKey }
   found?: string // secrets only: how it was found, shown once it has been opened
 }
 
 /** Bigger milestones hold better rewards. */
 export const ENVELOPE_DEFS: EnvelopeDef[] = [
+  { id: 'day3', title: 'Three Days In', tier: 'common', trigger: { type: 'day', value: 3 } },
+  { id: 'boss1', title: 'First Boss Down', tier: 'common', trigger: { type: 'bosses', value: 1 } },
   { id: 'day7', title: 'One Week In', tier: 'common', trigger: { type: 'day', value: 7 } },
   { id: 'w10', title: '10 Workouts', tier: 'common', trigger: { type: 'workouts', value: 10 } },
   { id: 'day15', title: 'Halfway Through Chapter 1', tier: 'common', trigger: { type: 'day', value: 15 } },
   { id: 'streak7', title: 'Seven-Day Streak', tier: 'rare', trigger: { type: 'streak', value: 7 } },
+  { id: 'streak14', title: 'Two-Week Streak', tier: 'rare', trigger: { type: 'streak', value: 14 } },
+  { id: 'str10', title: 'Strong Ten', tier: 'rare', trigger: { type: 'strength', value: 10 } },
+  { id: 'boss5', title: 'Boss Hunter', tier: 'rare', trigger: { type: 'bosses', value: 5 } },
   { id: 'day30', title: 'Chapter 1 Complete', tier: 'rare', trigger: { type: 'day', value: 30 } },
   { id: 'w25', title: '25 Workouts', tier: 'rare', trigger: { type: 'workouts', value: 25 } },
   { id: 'day45', title: 'Halfway Hero', tier: 'rare', trigger: { type: 'day', value: 45 } },
   { id: 'day60', title: 'Chapter 2 Complete', tier: 'legendary', trigger: { type: 'day', value: 60 } },
   { id: 'w50', title: '50 Workouts', tier: 'legendary', trigger: { type: 'workouts', value: 50 } },
+  { id: 'w75', title: '75 Workouts', tier: 'legendary', trigger: { type: 'workouts', value: 75 } },
+  { id: 'streak30', title: 'Thirty-Day Streak', tier: 'legendary', trigger: { type: 'streak', value: 30 } },
   { id: 'day75', title: 'The Final Stretch', tier: 'legendary', trigger: { type: 'day', value: 75 } },
   { id: 'day90', title: 'The 90-Day Legend', tier: 'legendary', trigger: { type: 'day', value: 90 } },
   // Secrets: shown as "???" with no hint until found. The rules live in computeStats (stats.secrets).
@@ -25,6 +32,12 @@ export const ENVELOPE_DEFS: EnvelopeDef[] = [
   { id: 'secret-perfect-day', title: 'The Perfect Day', tier: 'rare', trigger: { type: 'secret', key: 'perfectDay' }, found: 'A 30-minute walk, a strength session, 30 minutes of other movement, every quest, the bonus mission and a journal entry, all in one day.' },
   { id: 'secret-going-long', title: 'Going Long', tier: 'rare', trigger: { type: 'secret', key: 'goingLong' }, found: 'Ten walks longer than 30 minutes.' },
   { id: 'secret-perfect-week', title: 'The Perfect Week', tier: 'legendary', trigger: { type: 'secret', key: 'perfectWeek' }, found: 'Six walks, four strength sessions, the weekly reflection and the boss, all in one week.' },
+  { id: 'secret-night-shift-hero', title: 'Night Shift Hero', tier: 'common', trigger: { type: 'secret', key: 'nightShiftHero' }, found: 'You walked for 30 minutes or more on a night shift.' },
+  { id: 'secret-hydration-hero', title: 'Hydration Hero', tier: 'rare', trigger: { type: 'secret', key: 'hydrationHero' }, found: 'You met your water goal seven days in a row.' },
+  { id: 'secret-dear-diary', title: 'Dear Diary', tier: 'rare', trigger: { type: 'secret', key: 'dearDiary' }, found: 'You wrote in your journal seven days in a row.' },
+  { id: 'secret-theme-explorer', title: 'Theme Explorer', tier: 'rare', trigger: { type: 'secret', key: 'themeExplorer' }, found: 'You walked in every one of the walk themes.' },
+  { id: 'secret-fifteen-thousand', title: 'Fifteen Thousand', tier: 'rare', trigger: { type: 'secret', key: 'fifteenThousand' }, found: 'You logged 15,000 steps in a single day.' },
+  { id: 'secret-perfect-chapter', title: 'The Perfect Chapter', tier: 'legendary', trigger: { type: 'secret', key: 'perfectChapter' }, found: 'Every single day of a chapter had a walk or a planned recovery day, with no streak freeze.' },
 ]
 export const isSecret = (def: EnvelopeDef) => def.trigger.type === 'secret'
 
@@ -54,6 +67,9 @@ export const PRIZES: PrizeDef[] = [
   { key: 'drink', kind: 'treat', tiers: ['common'], title: 'A fancy drink', text: 'Treat yourself to a fancy drink on your next day off.', emoji: '🧋' },
   { key: 'lazy', kind: 'treat', tiers: ['common'], title: 'A guilt-free lazy evening', text: 'Pajamas by 8, phone on silent, nothing on the list.', emoji: '🛋️' },
   { key: 'order-in', kind: 'treat', tiers: ['common'], title: 'Order in tonight', text: 'You’ve earned a night without cooking.', emoji: '🍜' },
+  { key: 'snack', kind: 'treat', tiers: ['common'], title: 'A favorite snack or drink', text: 'Your pick, up to $10.', emoji: '🍫' },
+  { key: 'bath', kind: 'treat', tiers: ['common'], title: 'A long bath or shower', text: 'No rushing, no phone.', emoji: '🛁' },
+  { key: 'flowers', kind: 'treat', tiers: ['common'], title: 'Fresh flowers for your space', text: 'Pick up a bunch, up to $20.', emoji: '💐' },
   { key: 'photoshoot', kind: 'mission', tiers: ['common'], title: 'Mini photoshoot', text: 'Take one confident photo of yourself today. Keep it.', emoji: '📸' },
   // rare
   { key: 'xp40', kind: 'xp', tiers: ['rare'], title: '40 bonus XP', text: 'A rare drop, added to your total straight away.', emoji: '💠', xp: 40 },
@@ -62,10 +78,15 @@ export const PRIZES: PrizeDef[] = [
   { key: 'off20', kind: 'discount', tiers: ['rare'], title: '20% off a shop reward', text: 'Use it when you unlock any reward in the shop.', emoji: '🎟️', pct: 20 },
   { key: 'movie', kind: 'treat', tiers: ['rare'], title: 'Movie night, your pick', text: 'Your choice, no compromises, good snacks.', emoji: '🎬' },
   { key: 'spa', kind: 'treat', tiers: ['rare'], title: 'Spa night at home', text: 'Mask, candle, playlist, lights down.', emoji: '🕯️' },
+  { key: 'brunch', kind: 'treat', tiers: ['rare'], title: 'Breakfast out', text: 'Somewhere you like, up to $25.', emoji: '🥞' },
+  { key: 'shopping', kind: 'treat', tiers: ['rare'], title: 'A self-care shopping trip', text: 'Browse, pick, enjoy it. Up to $60.', emoji: '🛒' },
+  { key: 'candle', kind: 'treat', tiers: ['rare'], title: 'A candle or small cosy thing for home', text: 'Up to $30.', emoji: '🕯️' },
   // legendary
   { key: 'xp75', kind: 'xp', tiers: ['legendary'], title: '75 bonus XP', text: 'A legendary drop, added to your total straight away.', emoji: '🌟', xp: 75 },
   { key: 'off35', kind: 'discount', tiers: ['legendary'], title: '35% off a shop reward', text: 'Use it when you unlock any reward in the shop. Save it for a big one.', emoji: '🎫', pct: 35 },
   { key: 'cart', kind: 'treat', tiers: ['legendary'], title: 'Buy the thing in your cart', text: 'The one you keep leaving there. Today it’s allowed.', emoji: '🛍️' },
+  { key: 'dinner', kind: 'treat', tiers: ['legendary'], title: 'A meal out at a restaurant you pick', text: 'Somewhere you’ve wanted to try, up to $60.', emoji: '🍽️' },
+  { key: 'book', kind: 'treat', tiers: ['legendary'], title: 'A new book, game or hobby item', text: 'Something just for you, up to $50.', emoji: '📖' },
   { key: 'day-out', kind: 'treat', tiers: ['legendary'], title: 'A day out, planned by you', text: 'Somewhere you’ve been meaning to go. Put it in the calendar.', emoji: '🗺️' },
 ]
 export const prizeDef = (key: string | undefined) => PRIZES.find((p) => p.key === key)
