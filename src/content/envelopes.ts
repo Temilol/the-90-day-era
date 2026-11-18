@@ -22,7 +22,7 @@ export const ENVELOPE_DEFS: EnvelopeDef[] = [
   // Secrets: shown as "???" with no hint until found. The rules live in computeStats (stats.secrets).
   { id: 'secret-showed-up', title: 'Showed Up Anyway', tier: 'common', trigger: { type: 'secret', key: 'showedUp' }, found: 'You logged a short walk on a shift day when skipping would have been easier.' },
   { id: 'secret-rest-walk', title: 'Couldn’t Sit Still', tier: 'common', trigger: { type: 'secret', key: 'restWalk' }, found: 'You walked on a day you had planned as rest.' },
-  { id: 'secret-perfect-day', title: 'The Perfect Day', tier: 'rare', trigger: { type: 'secret', key: 'perfectDay' }, found: 'The walk, every quest, the bonus mission, a journal entry and a strength session, all in one day.' },
+  { id: 'secret-perfect-day', title: 'The Perfect Day', tier: 'rare', trigger: { type: 'secret', key: 'perfectDay' }, found: 'A 30-minute walk, a strength session, 30 minutes of other movement, every quest, the bonus mission and a journal entry, all in one day.' },
   { id: 'secret-going-long', title: 'Going Long', tier: 'rare', trigger: { type: 'secret', key: 'goingLong' }, found: 'Ten walks longer than 30 minutes.' },
   { id: 'secret-perfect-week', title: 'The Perfect Week', tier: 'legendary', trigger: { type: 'secret', key: 'perfectWeek' }, found: 'Six walks, four strength sessions, the weekly reflection and the boss, all in one week.' },
 ]

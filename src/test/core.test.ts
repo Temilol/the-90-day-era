@@ -656,11 +656,13 @@ describe('secret envelopes', () => {
     for (const q of ['nourish', 'protein', 'stretch']) s.toggleQuest(day1, q)
     s.addWater(day1, 2000) // hydration can only be completed by logging water
     s.setBonusMission(day1, 'Dance break', 'Wheel'); s.completeBonusMission(day1)
-    s.saveJournal(day1, { mood: 'good' })
+    s.saveJournal(day1, { reflection: 'A long day, and I still did all of it.' })
     expect(secrets().perfectDay).toBe(false) // no strength yet
     s.logStrength('2026-01-02', 10) // on a different day doesn't count
     expect(secrets().perfectDay).toBe(false)
     s.logStrength(day1, 10)
+    expect(secrets().perfectDay).toBe(false) // no other activity yet
+    s.addActivity(day1, { name: 'Bike ride', minutes: 30 })
     expect(secrets().perfectDay).toBe(true)
     expect(has('secret-perfect-day')).toBe(true)
   })
@@ -996,6 +998,79 @@ describe('bonus XP worked out from what she has logged', () => {
     useStore.getState().checkProgress()
     expect(useStore.getState().xp).toHaveLength(after) // nothing more to add or remove
     for (const id of Object.keys(useStore.getState().badges)) expect(xpOf(`badge:${id}`)).toBeGreaterThan(0)
+  })
+
+  describe('the newer bonuses', () => {
+    const today = todayKeyForTest()
+    const log = (date: string, over: object = {}) => ({ date, quests: {}, ...over })
+    const walked = (date: string, minutes = 30, theme?: string) => ({ kind: 'standard' as const, minutes, incline: 12, speed: 3, loggedAt: `${date}T10:00:00`, theme })
+    const withDays = (start: string, entries: Record<string, object>) => { fresh(start, { days: Object.fromEntries(Object.entries(entries).map(([d, o]) => [d, log(d, o)])) }); useStore.getState().checkProgress() }
+
+    it('a perfect day pays 15, needs every part, and is kept once earned', () => {
+      const date = addDays(today, -1)
+      const full = { workout: walked(date), strength: { minutes: 5, loggedAt: `${date}T11:00:00` }, activities: [{ id: 'a', name: 'Bike', minutes: 30, loggedAt: `${date}T12:00:00` }], bonusMission: { text: 'Dance', source: 'Wheel', done: true }, journal: { reflection: 'Did every single thing today.', updatedAt: `${date}T21:00:00` }, quests: { a: 'x', b: 'x', c: 'x', d: 'x' } }
+      withDays(addDays(today, -5), { [date]: full })
+      expect(xpOf(`perfect:${date}`)).toBe(15)
+      // each missing part means no perfect day
+      const short: Record<string, object> = { walk: { workout: walked(date, 29) }, strength: { strength: { minutes: 4, loggedAt: '' } }, activity: { activities: [{ id: 'a', name: 'Bike', minutes: 29, loggedAt: '' }] }, mission: { bonusMission: { text: 'Dance', source: 'Wheel', done: false } }, journal: { journal: { mood: 'good', updatedAt: `${date}T21:00:00` } }, quests: { quests: { a: 'x', b: 'x', c: 'x' } } }
+      for (const [k, v] of Object.entries(short)) { withDays(addDays(today, -5), { [date]: { ...full, ...v } }); expect([k, xpOf(`perfect:${date}`)]).toEqual([k, 0]) }
+      // once earned it stays, even if the day is edited afterwards
+      withDays(addDays(today, -5), { [date]: full })
+      useStore.setState((st) => { st.days[date] = { ...st.days[date], journal: undefined } })
+      useStore.getState().checkProgress()
+      expect(xpOf(`perfect:${date}`)).toBe(15)
+    })
+
+    it('a chapter pays 30, 45 or 60 only with 20 active days, and is kept', () => {
+      const start = addDays(today, -31) // today is day 32, so chapter 1 is over
+      withDays(start, Object.fromEntries(Array.from({ length: 19 }, (_, i) => [addDays(start, i), { workout: walked(addDays(start, i), 10) }])))
+      expect(xpOf('chapter:1')).toBe(0)
+      withDays(start, Object.fromEntries(Array.from({ length: 20 }, (_, i) => [addDays(start, i), { workout: walked(addDays(start, i), 10) }])))
+      expect(xpOf('chapter:1')).toBe(30)
+      expect(xpOf('chapter:2')).toBe(0) // chapter 2 isn't over yet
+      useStore.getState().removeWorkout(start)
+      expect(xpOf('chapter:1')).toBe(30) // earned, so it stays
+    })
+
+    it('a comeback pays 10 after three quiet days, once per challenge week', () => {
+      const start = addDays(today, -20)
+      const w = (i: number) => [addDays(start, i), { workout: walked(addDays(start, i), 10) }] as const
+      // walk day 1, three quiet days, walk day 5; then quiet 6-8, walk day 9 (week 2)
+      withDays(start, Object.fromEntries([w(0), w(4), w(8)]))
+      expect([xpOf('comeback:1'), xpOf('comeback:2')]).toEqual([10, 10])
+      // two quiet days is not a break
+      withDays(start, Object.fromEntries([w(0), w(3)]))
+      expect(xpOf('comeback:1')).toBe(0)
+      // two breaks in one week still pay once
+      withDays(start, Object.fromEntries([w(0), w(4), w(6)]))
+      expect(useStore.getState().xp.filter((e) => e.id.startsWith('comeback:'))).toHaveLength(1)
+      // the first walk of the challenge is not a comeback
+      withDays(start, Object.fromEntries([w(4)]))
+      expect(xpOf('comeback:1')).toBe(0)
+    })
+
+    it('water and journal weeks need every day of the week', () => {
+      const start = addDays(today, -13)
+      const week = (from: number, over: (d: string) => object) => Object.fromEntries(Array.from({ length: 7 }, (_, i) => [addDays(start, from + i), over(addDays(start, from + i))]))
+      const wrote = (d: string) => ({ journal: { reflection: 'Wrote something real today.', updatedAt: `${d}T20:00:00` } })
+      withDays(start, { ...week(0, () => ({ water: 1893 })), ...week(7, () => ({ water: 1893 })) })
+      expect([xpOf('waterweek:1'), xpOf('waterweek:2')]).toEqual([10, 10])
+      withDays(start, { ...week(0, () => ({ water: 1893 })), ...Object.fromEntries(Array.from({ length: 6 }, (_, i) => [addDays(start, 7 + i), { water: 1893 }])) })
+      expect([xpOf('waterweek:1'), xpOf('waterweek:2')]).toEqual([10, 0])
+      withDays(start, { ...week(0, wrote), ...week(7, (d) => (d === addDays(start, 9) ? {} : wrote(d))) })
+      expect([xpOf('journalweek:1'), xpOf('journalweek:2')]).toEqual([10, 0])
+      // kept once earned
+      useStore.setState((st) => { st.days[start] = { ...st.days[start], journal: undefined } })
+      useStore.getState().checkProgress()
+      expect(xpOf('journalweek:1')).toBe(10)
+    })
+
+    it('the first walk in each new theme pays 3, once per theme', () => {
+      const start = addDays(today, -5)
+      withDays(start, { [start]: { workout: walked(start, 10, 'hill') }, [addDays(start, 1)]: { workout: walked(addDays(start, 1), 10, 'hill') }, [addDays(start, 2)]: { workout: walked(addDays(start, 2), 10, 'interval') } })
+      expect([xpOf('theme:hill'), xpOf('theme:interval')]).toEqual([3, 3])
+      expect(useStore.getState().xp.filter((e) => e.id.startsWith('theme:'))).toHaveLength(2)
+    })
   })
 })
 

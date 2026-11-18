@@ -1,6 +1,7 @@
 import type { DayLog, EraState, ShiftType } from './types'
 import { TOTAL_DAYS, addDays, dayNumber, dateForDay, todayKey, weekOf, chapterOf, parseKey } from './dates'
-import { levelFor, stepGoalOf } from './xp'
+import { levelFor, stepGoalOf, ACTIVITY_MIN_MINUTES } from './xp'
+import { journalLength } from './journal'
 import { SELF_CARE_IDS } from '@/content/quests'
 import { BOSSES } from '@/content/bosses'
 import type { SecretKey } from '@/content/envelopes'
@@ -64,6 +65,20 @@ export interface Stats {
   freezesLeftByChapter: number[]
   bonusFreezes: number // unused extra freezes won from envelopes
   secrets: Record<SecretKey, boolean> // which secret-envelope conditions have been met
+}
+
+/**
+ * A perfect day: a walk of 30 minutes or more, a strength session of 5 or more, other activity adding
+ * up to 30, the bonus mission, a journal entry with real writing, and at least four quests. The +XP
+ * bonus and the secret envelope both use this, so they always agree.
+ */
+export function isPerfectDay(d: DayLog): boolean {
+  return (d.workout?.minutes ?? 0) >= 30
+    && (d.strength?.minutes ?? 0) >= 5
+    && (d.activities ?? []).reduce((n, a) => n + (a.minutes || 0), 0) >= ACTIVITY_MIN_MINUTES
+    && !!d.bonusMission?.done
+    && journalLength(d.journal) >= 20
+    && Object.keys(d.quests || {}).length >= 4
 }
 
 export function isActiveDay(d?: DayLog): boolean {
@@ -200,11 +215,10 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
 
   // Secret envelopes. Nothing in the app hints at these.
   const walked = (d: DayLog) => !!d.workout && d.workout.minutes >= 5
-  const written = (d: DayLog) => !!d.journal && Object.values(d.journal).some((v) => v && v !== d.journal!.updatedAt)
   const secrets: Stats['secrets'] = {
     showedUp: logs.some((d) => walked(d) && d.workout!.minutes < 20 && (d.shift === 'day' || d.shift === 'night')),
     restWalk: logs.some((d) => walked(d) && d.shift === 'recovery'),
-    perfectDay: logs.some((d) => walked(d) && !!d.strength && !!d.bonusMission?.done && written(d) && Object.keys(d.quests || {}).length >= 4),
+    perfectDay: logs.some(isPerfectDay),
     goingLong: workoutsList.filter((d) => d.workout!.minutes > 30).length >= 10,
     perfectWeek: weekly.some((w) => {
       const boss = BOSSES.find((b) => b.week === w.week)
