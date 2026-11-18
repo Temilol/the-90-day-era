@@ -752,9 +752,11 @@ describe('secret envelopes', () => {
   })
   it('old saved data starts the newer envelope rules from now, and new data from the start', async () => {
     const { upgradeData } = await import('@/store/useStore')
-    expect(upgradeData({ profile: { onboarded: true } } as never).envelopeSince).toBeTruthy()
-    expect(upgradeData({ profile: { onboarded: false } } as never).envelopeSince).toBeUndefined()
-    expect(upgradeData({ profile: { onboarded: true }, envelopeSince: '' } as never).envelopeSince).toBe('')
+    type Data = Partial<ReturnType<typeof initialState>>
+    const profile = (onboarded: boolean) => ({ ...initialState().profile, onboarded })
+    expect(upgradeData({ profile: profile(true) } as Data).envelopeSince).toBeTruthy()
+    expect(upgradeData({ profile: profile(false) } as Data).envelopeSince).toBeUndefined()
+    expect(upgradeData({ profile: profile(true), envelopeSince: '' } as Data).envelopeSince).toBe('')
     expect(initialState().envelopeSince).toBe('')
   })
   it('Double XP, two days in a row doubles both days and is spent until both have passed', async () => {

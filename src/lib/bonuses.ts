@@ -1,4 +1,4 @@
-import type { DayLog, EraState } from './types'
+import type { EraState } from './types'
 import { chapterStats, isPerfectDay, type Stats } from './stats'
 import { journalLength, journalEarns, JOURNAL_MIN_CHARS } from './journal'
 import { waterSettings, goalMet } from './water'
