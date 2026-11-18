@@ -1329,3 +1329,39 @@ describe('journal quest ticks itself', () => {
     useStore.setState(initialState())
   })
 })
+
+describe('progress page numbers', () => {
+  const start = '2026-01-05' // a Monday
+  const log = (date: string, over: object = {}) => [date, { date, quests: {}, ...over }] as const
+  const walk = (minutes: number, theme?: string) => ({ workout: { kind: 'standard' as const, minutes, incline: 12, speed: 3, loggedAt: '', theme } })
+  it('counts walks by weekday, Monday first, and ignores walks under 5 minutes', async () => {
+    const { walksByWeekday } = await import('@/lib/walkStats')
+    const days = Object.fromEntries([log('2026-01-05', walk(20)), log('2026-01-06', walk(20)), log('2026-01-12', walk(30)), log('2026-01-11', walk(4))])
+    expect(walksByWeekday(days, start, '2026-02-01')).toEqual([2, 1, 0, 0, 0, 0, 0])
+    expect(walksByWeekday(days, start, '2026-01-05')).toEqual([1, 0, 0, 0, 0, 0, 0]) // days after today don't count
+  })
+  it('splits walks into the four length buckets', async () => {
+    const { walkLengthMix } = await import('@/lib/walkStats')
+    const mins = [5, 10, 11, 20, 21, 30, 31, 60]
+    const days = Object.fromEntries(mins.map((m, i) => log(addDays(start, i), walk(m))))
+    expect(walkLengthMix(days, start, addDays(start, 30))).toEqual([2, 2, 2, 2])
+  })
+  it('ranks themes by walks and ignores ones that no longer exist', async () => {
+    const { themeCounts } = await import('@/lib/walkStats')
+    const days = Object.fromEntries(['a', 'b', 'b', 'c', 'zzz'].map((t, i) => log(addDays(start, i), walk(10, t))))
+    expect(themeCounts(days, start, addDays(start, 30), ['a', 'b', 'c'])).toEqual([{ id: 'b', count: 2 }, { id: 'a', count: 1 }, { id: 'c', count: 1 }])
+  })
+  it('groups other activities by name, ignoring case and spacing, most minutes first', async () => {
+    const { activityRanking } = await import('@/lib/walkStats')
+    const act = (name: string, minutes: number) => ({ id: name + minutes, name, minutes, loggedAt: '' })
+    const days = Object.fromEntries([log(start, { activities: [act('Spin class', 45), act('Stairs', 10)] }), log(addDays(start, 1), { activities: [act(' spin  CLASS ', 30), act('', 20)] })])
+    const r = activityRanking(days, start, addDays(start, 5))
+    expect(r.rows).toEqual([{ name: 'Spin class', minutes: 75, sessions: 2 }, { name: 'Stairs', minutes: 10, sessions: 1 }])
+    expect([r.minutes, r.sessions]).toEqual([85, 3])
+  })
+  it('counts journal days by the same writing rule that pays XP', async () => {
+    const { journalDays } = await import('@/lib/walkStats')
+    const days = Object.fromEntries([log(start, { journal: { reflection: 'Wrote something real today.', updatedAt: '' } }), log(addDays(start, 1), { journal: { mood: 'good', updatedAt: '' } }), log(addDays(start, 2), { journal: { reflection: 'Short.', updatedAt: '' } })])
+    expect(journalDays(days, start, addDays(start, 5))).toBe(1)
+  })
+})
