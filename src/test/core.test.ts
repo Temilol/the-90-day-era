@@ -609,8 +609,9 @@ describe('envelopes: tiers, pick one of three, prizes you keep', () => {
     expect(useStore.getState().capsule?.text).toBe('Dear me, keep going.')
     for (let i = 0; i < 4; i++) s.logWorkout(addDays(day1, i), { minutes: 30, incline: 12, speed: 3 })
     const st = useStore.getState()
-    const boss = { boss1: { id: 'boss1', unlockedAt: 'x' } }
-    expect(nextEnvelope(computeStats(st, addDays(day1, 3)), {})).toEqual({ title: 'First Boss Down', need: '1 more boss defeat' })
+    const early = { day5: { id: 'day5', unlockedAt: 'x' } }
+    const boss = { ...early, 'boss-down': { id: 'boss-down', unlockedAt: 'x' } }
+    expect(nextEnvelope(computeStats(st, addDays(day1, 3)), early)).toEqual({ title: 'Boss Down', need: '1 more boss defeat' })
     expect(nextEnvelope(computeStats(st, addDays(day1, 3)), boss)).toEqual({ title: 'One Week In', need: '3 more days' })
     expect(nextEnvelope(computeStats(st, addDays(day1, 3)), { ...boss, day7: { id: 'day7', unlockedAt: 'x' } })).toEqual({ title: 'Seven-Day Streak', need: '3 more days in a row' })
   })
@@ -730,6 +731,52 @@ describe('secret envelopes', () => {
     useStore.setState({ days: { ...days(30, 12), [addDays(day1, 12)]: { date: addDays(day1, 12), quests: {}, recovery: true } }, freezes: {} })
     expect(secrets().perfectChapter).toBe(true)
   })
+  it('Night Shift Hero and Boss Down count only from when the newer rules began', () => {
+    const now = new Date().toISOString()
+    const before = '2026-01-02T08:00:00.000Z', after = '2999-01-01T00:00:00.000Z'
+    fresh()
+    const s = useStore.getState()
+    s.setShift(day1, 'night')
+    s.logWorkout(day1, { minutes: 40, incline: 12, speed: 3 })
+    useStore.setState({ envelopeSince: after }) // the new rules begin later than that walk
+    expect(secrets().nightShiftHero).toBe(false)
+    useStore.setState({ envelopeSince: before })
+    expect(secrets().nightShiftHero).toBe(true)
+    // bosses: one defeated before the rules began doesn't count, the next one does
+    fresh()
+    useStore.setState((st) => { st.xp.push({ id: 'boss:old', amount: 25, reason: 'Defeated', date: day1, at: before }) })
+    useStore.setState({ envelopeSince: now })
+    expect(computeStats(useStore.getState(), day1).bossesSinceUpdate).toBe(0)
+    useStore.setState((st) => { st.xp.push({ id: 'boss:new', amount: 25, reason: 'Defeated', date: day1, at: after }) })
+    expect(computeStats(useStore.getState(), day1).bossesSinceUpdate).toBe(1)
+  })
+  it('old saved data starts the newer envelope rules from now, and new data from the start', async () => {
+    const { upgradeData } = await import('@/store/useStore')
+    expect(upgradeData({ profile: { onboarded: true } } as never).envelopeSince).toBeTruthy()
+    expect(upgradeData({ profile: { onboarded: false } } as never).envelopeSince).toBeUndefined()
+    expect(upgradeData({ profile: { onboarded: true }, envelopeSince: '' } as never).envelopeSince).toBe('')
+    expect(initialState().envelopeSince).toBe('')
+  })
+  it('Double XP, two days in a row doubles both days and is spent until both have passed', async () => {
+    const { prizeUsed } = await import('@/lib/prizes')
+    const { todayKey } = await import('@/lib/dates')
+    const today = todayKey(), tomorrow = addDays(today, 1)
+    fresh(); useStore.setState({ profile: { name: 'T', startDate: addDays(today, -3), units: 'lb', onboarded: true } })
+    useStore.setState({ prizes: [{ id: 'p1', key: 'double2', from: 'x', wonAt: new Date().toISOString() }] })
+    useStore.getState().logWorkout(today, { minutes: 30, incline: 12, speed: 3 })
+    useStore.getState().redeemPrize('p1')
+    const st = useStore.getState()
+    expect([st.days[today].doubleXp, st.days[tomorrow].doubleXp]).toEqual(['p1', 'p1'])
+    expect(st.xp.find((e) => e.id === `double:${today}`)?.amount).toBe(25)
+    expect(prizeUsed(st.prizes[0], st, today)).toBe(true)
+    // Once tomorrow arrives, its walk doubles too.
+    const yesterday = addDays(today, -1)
+    fresh(); useStore.setState({ profile: { name: 'T', startDate: addDays(today, -3), units: 'lb', onboarded: true } })
+    useStore.setState((x) => { x.prizes = [{ id: 'p2', key: 'double2', from: 'x', wonAt: yesterday, usedOn: yesterday, usedAt: yesterday }]; x.days[yesterday] = { date: yesterday, quests: {}, doubleXp: 'p2' }; x.days[today] = { date: today, quests: {}, doubleXp: 'p2' } })
+    useStore.getState().logWorkout(today, { minutes: 30, incline: 12, speed: 3 })
+    expect(useStore.getState().xp.find((e) => e.id === `double:${today}`)?.amount).toBe(25)
+    expect(prizeUsed(useStore.getState().prizes[0], useStore.getState(), today)).toBe(true)
+  })
   it('the new visible envelopes unlock on boss, strength, streak and workout goals', () => {
     fresh()
     const s = useStore.getState()
@@ -737,7 +784,7 @@ describe('secret envelopes', () => {
     s.logStrength(day1, 10)
     const has = (id: string) => !!useStore.getState().envelopes[id]
     s.checkProgress()
-    expect([has('day3'), has('boss1'), has('str10')]).toEqual([true, false, false])
+    expect([has('day5'), has('boss-down'), has('str10')]).toEqual([true, false, false])
   })
   it('The Perfect Week: 6 walks, 4 strength, the reflection and the boss in one week', async () => {
     const { BOSSES } = await import('@/content/bosses')

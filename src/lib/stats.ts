@@ -26,6 +26,7 @@ export interface Stats {
   fullWorkouts: number
   walkingMinutes: number
   strengthSessions: number
+  bossesSinceUpdate: number // bosses defeated since the newer envelope rules began
   strengthMinutes: number
   recoveryDays: number
   streak: number
@@ -184,6 +185,8 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
     if (d.shift && steps.byShift[d.shift]) { steps.byShift[d.shift].days++; steps.byShift[d.shift].total += d.steps }
   }
   const bossesDefeated = s.xp.filter((e) => e.id.startsWith('boss:')).length
+  const since = s.envelopeSince ?? ''
+  const bossesSinceUpdate = s.xp.filter((e) => e.id.startsWith('boss:') && e.at >= since).length
   const reflections = Object.keys(s.reflections).length
   const envelopesOpened = Object.values(s.envelopes).filter((e) => e.openedAt).length
   const themesUsed = [...new Set(workoutsList.map((d) => d.workout!.theme).filter(Boolean) as string[])]
@@ -229,7 +232,8 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
     showedUp: logs.some((d) => walked(d) && d.workout!.minutes < 20 && (d.shift === 'day' || d.shift === 'night')),
     restWalk: logs.some((d) => walked(d) && d.shift === 'recovery'),
     perfectDay: logs.some(isPerfectDay),
-    nightShiftHero: logs.some((d) => d.shift === 'night' && (d.workout?.minutes ?? 0) >= 30),
+    // Counts only walks logged since the newer envelope rules began, so past walks don't open it.
+    nightShiftHero: logs.some((d) => d.shift === 'night' && (d.workout?.minutes ?? 0) >= 30 && (d.workout?.loggedAt ?? '') >= since),
     hydrationHero: longestRun(startDate, (d) => goalMet(d?.water, goalMl)) >= 7,
     dearDiary: longestRun(startDate, (d) => !!d && journalEarns(d)) >= 7,
     themeExplorer: THEMES.every((t) => themesUsed.includes(t.id)),
@@ -257,7 +261,7 @@ export function computeStats(s: EraState, today: string = todayKey()): Stats {
     workouts, fullWorkouts, walkingMinutes, strengthSessions, strengthMinutes, recoveryDays,
     streak, bestStreak, lifetimeXp, spentXp, spendableXp, balanceXp: Math.max(0, spendableXp), owedXp: Math.max(0, -spendableXp), level: levelFor(lifetimeXp),
     questsCompleted, questCounts, selfCareQuests, journalEntries, nightShiftWorkouts, dayShiftWorkouts, byShift, calories, otherActivities, water, steps,
-    bossesDefeated, reflections, purchases: s.purchases.length, spins: s.spins.length, envelopesOpened,
+    bossesDefeated, bossesSinceUpdate, reflections, purchases: s.purchases.length, spins: s.spins.length, envelopesOpened,
     comebacks, themesUsed, bonusMissions, weekly, nsvs: s.nsvs.length, weights: s.weights.length, activeDates, frozenDates, freezesLeft, freezesLeftByChapter, bonusFreezes, secrets,
   }
 }

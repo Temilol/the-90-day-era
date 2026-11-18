@@ -1,5 +1,6 @@
 import type { Envelope, EraState, Prize } from './types'
 import type { Stats } from './stats'
+import { addDays } from './dates'
 import { ENVELOPE_DEFS, PRIZES, prizeDef, type PrizeDef, type PrizeKind } from '@/content/envelopes'
 
 /**
@@ -10,7 +11,11 @@ import { ENVELOPE_DEFS, PRIZES, prizeDef, type PrizeDef, type PrizeKind } from '
 export function prizeUsed(p: Prize, s: Pick<EraState, 'days' | 'freezes'>, today: string): boolean {
   const kind = prizeDef(p.key)?.kind
   if (kind === 'freeze') return !!p.usedOn && !!s.freezes[p.usedOn]
-  if (kind === 'double') return !!p.usedOn && s.days[p.usedOn]?.doubleXp === p.id && (p.usedOn >= today || !!s.days[p.usedOn]?.workout)
+  if (kind === 'double') {
+    if (!p.usedOn) return false
+    // A two-day prize is spent while either of its days still has it switched on.
+    return Array.from({ length: prizeDef(p.key)?.days ?? 1 }, (_, i) => addDays(p.usedOn!, i)).some((d) => s.days[d]?.doubleXp === p.id && (d >= today || !!s.days[d]?.workout))
+  }
   return !!p.usedAt
 }
 
@@ -50,8 +55,8 @@ export function nextEnvelope(stats: Stats, envelopes: Record<string, Envelope>):
     } else if (t.type === 'strength') {
       distance = t.value - stats.strengthSessions
       need = plural(distance, 'strength session')
-    } else if (t.type === 'bosses') {
-      distance = t.value - stats.bossesDefeated
+    } else if (t.type === 'bosses' || t.type === 'newBosses') {
+      distance = t.value - (t.type === 'bosses' ? stats.bossesDefeated : stats.bossesSinceUpdate)
       need = plural(distance, 'boss defeat')
     } else {
       distance = t.value - stats.streak

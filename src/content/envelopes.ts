@@ -2,14 +2,14 @@ export type Tier = 'common' | 'rare' | 'legendary'
 export type SecretKey = 'showedUp' | 'restWalk' | 'perfectDay' | 'goingLong' | 'perfectWeek' | 'nightShiftHero' | 'hydrationHero' | 'dearDiary' | 'themeExplorer' | 'fifteenThousand' | 'perfectChapter'
 export interface EnvelopeDef {
   id: string; title: string; tier: Tier
-  trigger: { type: 'day'; value: number } | { type: 'workouts'; value: number } | { type: 'streak'; value: number } | { type: 'strength'; value: number } | { type: 'bosses'; value: number } | { type: 'secret'; key: SecretKey }
+  trigger: { type: 'day'; value: number } | { type: 'workouts'; value: number } | { type: 'streak'; value: number } | { type: 'strength'; value: number } | { type: 'bosses'; value: number } | { type: 'newBosses'; value: number } | { type: 'secret'; key: SecretKey }
   found?: string // secrets only: how it was found, shown once it has been opened
 }
 
 /** Bigger milestones hold better rewards. */
 export const ENVELOPE_DEFS: EnvelopeDef[] = [
-  { id: 'day3', title: 'Three Days In', tier: 'common', trigger: { type: 'day', value: 3 } },
-  { id: 'boss1', title: 'First Boss Down', tier: 'common', trigger: { type: 'bosses', value: 1 } },
+  { id: 'day5', title: 'Five Days In', tier: 'common', trigger: { type: 'day', value: 5 } },
+  { id: 'boss-down', title: 'Boss Down', tier: 'common', trigger: { type: 'newBosses', value: 1 } },
   { id: 'day7', title: 'One Week In', tier: 'common', trigger: { type: 'day', value: 7 } },
   { id: 'w10', title: '10 Workouts', tier: 'common', trigger: { type: 'workouts', value: 10 } },
   { id: 'day15', title: 'Halfway Through Chapter 1', tier: 'common', trigger: { type: 'day', value: 15 } },
@@ -58,7 +58,7 @@ export const TIERS: Record<Tier, { label: string; emoji: string; chip: string; r
  *  mission  a small one-off thing to do, ticked off when done
  */
 export type PrizeKind = 'xp' | 'freeze' | 'double' | 'discount' | 'swap' | 'treat' | 'mission'
-export interface PrizeDef { key: string; kind: PrizeKind; tiers: Tier[]; title: string; text: string; emoji: string; xp?: number; pct?: number }
+export interface PrizeDef { key: string; kind: PrizeKind; tiers: Tier[]; title: string; text: string; emoji: string; xp?: number; pct?: number; days?: number /* double XP: how many days in a row */ }
 
 export const PRIZES: PrizeDef[] = [
   // common
@@ -70,6 +70,8 @@ export const PRIZES: PrizeDef[] = [
   { key: 'snack', kind: 'treat', tiers: ['common'], title: 'A favorite snack or drink', text: 'Your pick, up to $10.', emoji: '🍫' },
   { key: 'bath', kind: 'treat', tiers: ['common'], title: 'A long bath or shower', text: 'No rushing, no phone.', emoji: '🛁' },
   { key: 'flowers', kind: 'treat', tiers: ['common'], title: 'Fresh flowers for your space', text: 'Pick up a bunch, up to $20.', emoji: '💐' },
+  { key: 'facemask', kind: 'treat', tiers: ['common'], title: 'A face mask night', text: 'One sheet mask, up to $5.', emoji: '🧖‍♀️' },
+  { key: 'prettywalk', kind: 'mission', tiers: ['common'], title: 'Take your walk somewhere pretty', text: 'Do one walk outside, somewhere you like to look at.', emoji: '🌳' },
   { key: 'photoshoot', kind: 'mission', tiers: ['common'], title: 'Mini photoshoot', text: 'Take one confident photo of yourself today. Keep it.', emoji: '📸' },
   // rare
   { key: 'xp40', kind: 'xp', tiers: ['rare'], title: '40 bonus XP', text: 'A rare drop, added to your total straight away.', emoji: '💠', xp: 40 },
@@ -81,12 +83,24 @@ export const PRIZES: PrizeDef[] = [
   { key: 'brunch', kind: 'treat', tiers: ['rare'], title: 'Breakfast out', text: 'Somewhere you like, up to $25.', emoji: '🥞' },
   { key: 'shopping', kind: 'treat', tiers: ['rare'], title: 'A self-care shopping trip', text: 'Browse, pick, enjoy it. Up to $60.', emoji: '🛒' },
   { key: 'candle', kind: 'treat', tiers: ['rare'], title: 'A candle or small cosy thing for home', text: 'Up to $30.', emoji: '🕯️' },
+  { key: 'pedicure', kind: 'treat', tiers: ['rare'], title: 'A pedicure', text: 'Your colour, your pick, up to $40.', emoji: '💅' },
+  { key: 'takeout', kind: 'treat', tiers: ['rare'], title: 'Takeout from a place you’ve never tried', text: 'Something new, up to $30.', emoji: '🥡' },
+  { key: 'dessert', kind: 'treat', tiers: ['rare'], title: 'A dessert out', text: 'Something sweet, up to $20.', emoji: '🍰' },
+  { key: 'bathset', kind: 'treat', tiers: ['rare'], title: 'A bath set, bombs or oils', text: 'Up to $20.', emoji: '🫧' },
+  { key: 'lunch', kind: 'treat', tiers: ['rare'], title: 'A lunch out on a shift day', text: 'Skip the packed lunch for once, up to $20.', emoji: '🥗' },
+  { key: 'hair', kind: 'treat', tiers: ['rare'], title: 'Hair accessories', text: 'Scrunchies, clips or a headband, up to $20.', emoji: '🎀' },
   // legendary
   { key: 'xp75', kind: 'xp', tiers: ['legendary'], title: '75 bonus XP', text: 'A legendary drop, added to your total straight away.', emoji: '🌟', xp: 75 },
   { key: 'off35', kind: 'discount', tiers: ['legendary'], title: '35% off a shop reward', text: 'Use it when you unlock any reward in the shop. Save it for a big one.', emoji: '🎫', pct: 35 },
-  { key: 'cart', kind: 'treat', tiers: ['legendary'], title: 'Buy the thing in your cart', text: 'The one you keep leaving there. Today it’s allowed.', emoji: '🛍️' },
+  { key: 'cart', kind: 'treat', tiers: ['legendary'], title: 'Buy the thing in your cart', text: 'The one you keep leaving there. Today it’s allowed, up to $80.', emoji: '🛍️' },
   { key: 'dinner', kind: 'treat', tiers: ['legendary'], title: 'A meal out at a restaurant you pick', text: 'Somewhere you’ve wanted to try, up to $60.', emoji: '🍽️' },
   { key: 'book', kind: 'treat', tiers: ['legendary'], title: 'A new book, game or hobby item', text: 'Something just for you, up to $50.', emoji: '📖' },
+  { key: 'earrings', kind: 'treat', tiers: ['legendary'], title: 'Earrings or a small piece of jewellery', text: 'A little something to wear and keep, up to $80.', emoji: '💍' },
+  { key: 'fragrance', kind: 'treat', tiers: ['legendary'], title: 'A nice fragrance', text: 'One you’ll think of as yours, up to $50.', emoji: '🌸' },
+  { key: 'concert', kind: 'treat', tiers: ['legendary'], title: 'A concert, show or event ticket', text: 'Your choice, up to $70.', emoji: '🎟️' },
+  { key: 'pajamas', kind: 'treat', tiers: ['legendary'], title: 'A pajama or loungewear set', text: 'Soft, cosy and yours, up to $50.', emoji: '🌙' },
+  { key: 'outing', kind: 'treat', tiers: ['legendary'], title: 'An outing, your choice', text: 'Mini golf, bowling, an escape room. Up to $50.', emoji: '🎳' },
+  { key: 'double2', kind: 'double', tiers: ['legendary'], title: 'Double XP, two days in a row', text: 'Switch it on and today’s and tomorrow’s walks both earn double.', emoji: '⚡', days: 2 },
   { key: 'day-out', kind: 'treat', tiers: ['legendary'], title: 'A day out, planned by you', text: 'Somewhere you’ve been meaning to go. Put it in the calendar.', emoji: '🗺️' },
 ]
 export const prizeDef = (key: string | undefined) => PRIZES.find((p) => p.key === key)

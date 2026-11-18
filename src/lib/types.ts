@@ -127,6 +127,7 @@ export interface EraState {
   celebrations: Record<string, string>
   prizes: Prize[]
   priceRev: number // which round of default shop prices this data has had applied
+  envelopeSince: string // when the newer envelope rules began for this data; Night Shift Hero and Boss Down count only from then. Empty means from the start.
   capsule: Capsule | null
   freezes: Record<string, string> // date -> usedAt; patches a missed day for streak purposes
 }

@@ -7,7 +7,7 @@ import { useStore } from '@/store/useStore'
 import { useStats } from '@/lib/hooks'
 import { ENVELOPE_DEFS, TIERS, prizeDef, isSecret, LEGACY_REWARD_EMOJI, type EnvelopeDef } from '@/content/envelopes'
 import { prizeUsed } from '@/lib/prizes'
-import { formatDate } from '@/lib/dates'
+import { formatDate, addDays } from '@/lib/dates'
 import type { Prize } from '@/lib/types'
 import { Card, Modal, SectionTitle } from './ui'
 import { burst, hearts } from './Celebrate'
@@ -15,7 +15,7 @@ import { burst, hearts } from './Celebrate'
 const hintFor = (def: EnvelopeDef) => {
   const t = def.trigger
   if (t.type === 'secret') return 'A secret. No hints.'
-  return t.type === 'day' ? `Reach Day ${t.value} with ${Math.ceil(t.value / 3)}+ active days` : t.type === 'workouts' ? `${t.value} workouts` : t.type === 'strength' ? `${t.value} strength sessions` : t.type === 'bosses' ? (t.value === 1 ? 'Defeat your first boss' : `Defeat ${t.value} bosses`) : `${t.value}-day streak`
+  return t.type === 'day' ? `Reach Day ${t.value} with ${Math.ceil(t.value / 3)}+ active days` : t.type === 'workouts' ? `${t.value} workouts` : t.type === 'strength' ? `${t.value} strength sessions` : t.type === 'newBosses' ? 'Defeat a boss' : t.type === 'bosses' ? `Defeat ${t.value} bosses` : `${t.value}-day streak`
 }
 
 function TierChip({ tier }: { tier: EnvelopeDef['tier'] }) {
@@ -178,11 +178,11 @@ export function MyRewards() {
         {rows.length === 0 && <p className="text-sm text-muted">Rewards you pick from envelopes are kept here until you use them.</p>}
         {rows.map(({ p, def, used }) => {
           const kind = def!.kind
-          const pendingDouble = kind === 'double' && used && p.usedOn === today && !days[today]?.workout
+          const pendingDouble = kind === 'double' && used && days[today]?.doubleXp === p.id && !days[today]?.workout
           const status = kind === 'xp' ? `Added on ${short(p.wonAt.slice(0, 10))}`
             : !used ? from(p)
             : kind === 'freeze' ? `Used on ${short(p.usedOn!)}`
-            : kind === 'double' ? (pendingDouble ? 'On today. Log your walk to double it.' : `Used on ${short(p.usedOn!)}`)
+            : kind === 'double' ? (pendingDouble ? 'On today. Log your walk to double it.' : (def!.days ?? 1) > 1 ? `Used on ${short(p.usedOn!)} and ${short(addDays(p.usedOn!, 1))}` : `Used on ${short(p.usedOn!)}`)
             : kind === 'discount' ? `Used on ${p.note ?? 'a shop reward'}`
             : kind === 'swap' ? `Used on ${short(p.usedOn ?? p.usedAt!.slice(0, 10))}`
             : `Done on ${short(p.usedAt!.slice(0, 10))}`
@@ -196,7 +196,7 @@ export function MyRewards() {
               {!used && kind === 'freeze' && <Link to="/calendar" className={linkClass}>Use</Link>}
               {!used && kind === 'discount' && <Link to="/rewards#shop" className={linkClass}>Use in shop</Link>}
               {!used && kind === 'swap' && <Link to="/today" className={linkClass}>Use today</Link>}
-              {!used && kind === 'double' && <button className={linkClass} disabled={!stats.started || stats.finished} onClick={() => { redeemPrize(p.id); hearts() }}>Use today</button>}
+              {!used && kind === 'double' && <button className={linkClass} disabled={!stats.started || stats.finished} onClick={() => { redeemPrize(p.id); hearts() }}>{(def!.days ?? 1) > 1 ? 'Start today' : 'Use today'}</button>}
               {(kind === 'treat' || kind === 'mission') && <button className={used ? 'btn-ghost !py-1.5 text-xs shrink-0 whitespace-nowrap' : linkClass} onClick={() => { redeemPrize(p.id); if (!used) hearts() }}>{used ? 'Undo' : 'Mark done'}</button>}
               {used && kind !== 'treat' && kind !== 'mission' && <span className="text-mint-400 shrink-0" aria-label="Used">✓</span>}
             </div>

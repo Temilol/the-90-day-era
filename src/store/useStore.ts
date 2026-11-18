@@ -45,6 +45,7 @@ export function initialState(): EraState {
     prizes: [],
     capsule: null,
     priceRev: PRICE_REV,
+    envelopeSince: '',
     freezes: {},
   }
 }
@@ -124,8 +125,11 @@ function announceLevel(beforeLevel: number, s: EraState) {
  * Brings saved data from an older round up to date before it is used: untouched default rewards
  * move to the current prices, once. A price she changed herself is left alone.
  */
-export function upgradeData<T extends Partial<EraState>>(raw: T): T {
-  if (!raw || (raw.priceRev ?? 1) >= PRICE_REV) return raw
+export function upgradeData<T extends Partial<EraState>>(rawIn: T): T {
+  if (!rawIn) return rawIn
+  // Data saved before the newer envelopes existed starts counting for them from now, not from the past.
+  const raw = rawIn.envelopeSince === undefined && rawIn.profile?.onboarded ? { ...rawIn, envelopeSince: new Date().toISOString() } : rawIn
+  if ((raw.priceRev ?? 1) >= PRICE_REV) return raw
   const rewards = (raw.rewards ?? []).map((r) => {
     const def = DEFAULT_REWARDS.find((d) => d.id === r.id)
     return def && !r.custom && r.cost === FIRST_PRICES[r.id] ? { ...r, cost: def.cost } : r
@@ -462,16 +466,19 @@ export const useStore = create<Store>()(
           }
           if (kind !== 'double' || !readyPrizes(s0, 'double', today).some((x) => x.id === id)) return
           if (!inChallenge(s0, today)) { toast('Not right now', 'Double XP can be switched on during the challenge', 'warn'); return }
-          const active = s0.days[today]?.doubleXp
-          if (active && (s0.prizes ?? []).some((x) => x.id === active)) { toast('Double XP is already on today', undefined, 'info'); return }
+          const span = prizeDef(p0.key)?.days ?? 1
+          // Tomorrow can be switched on ahead of time, so only the 90 days themselves limit it.
+          const inEra = (d: string) => { const n = dayNumber(s0.profile.startDate!, d); return n >= 1 && n <= TOTAL_DAYS }
+          const dates = [today, addDays(today, 1)].slice(0, span).filter(inEra)
+          const taken = dates.find((d) => { const a = s0.days[d]?.doubleXp; return !!a && (s0.prizes ?? []).some((x) => x.id === a) })
+          if (taken) { toast(taken === today ? 'Double XP is already on today' : 'Double XP is already on tomorrow', undefined, 'info'); return }
           mutate((s) => {
             const p = s.prizes.find((x) => x.id === id)!
-            day(s, today).doubleXp = id
+            for (const d of dates) { day(s, d).doubleXp = id; syncDouble(s, d) }
             p.usedOn = today
             p.usedAt = now
-            syncDouble(s, today)
           })
-          toast('Double XP is on for today', s0.days[today]?.workout ? 'Today’s walk has been doubled' : 'Your walk today earns double', 'success')
+          toast(dates.length > 1 ? 'Double XP is on for today and tomorrow' : 'Double XP is on for today', s0.days[today]?.workout ? 'Today’s walk has been doubled' : 'Your walk earns double', 'success')
         },
         swapQuest: (date, questId) => {
           const s0 = get()
@@ -542,6 +549,7 @@ export const useStore = create<Store>()(
             if (t.type === 'workouts') return stats.workouts >= t.value
             if (t.type === 'strength') return stats.strengthSessions >= t.value
             if (t.type === 'bosses') return stats.bossesDefeated >= t.value
+            if (t.type === 'newBosses') return stats.bossesSinceUpdate >= t.value
             if (t.type === 'secret') return stats.secrets[t.key]
             return stats.bestStreak >= t.value
           })
