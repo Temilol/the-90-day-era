@@ -1365,3 +1365,51 @@ describe('progress page numbers', () => {
     expect(journalDays(days, start, addDays(start, 5))).toBe(1)
   })
 })
+
+describe('backup and restore', () => {
+  it('a full export/reset/import keeps everything, including kept bonuses and the envelope baseline', async () => {
+    const { exportJson, snapshot } = await import('@/store/useStore')
+    const today = todayKeyForTest()
+    const startDate = addDays(today, -40)
+    useStore.setState({ ...initialState(), profile: { name: 'T', startDate, units: 'lb', onboarded: true }, envelopeSince: addDays(today, -10) + 'T08:00:00.000Z' })
+    const s = useStore.getState()
+    // Thirty days of walks, strength and journal so chapter 1 completes and perfect days can form.
+    for (let i = 0; i < 30; i++) {
+      const d = addDays(startDate, i)
+      s.logWorkout(d, { minutes: 35, incline: 12, speed: 3, theme: i % 2 ? 'true-crime' : 'comedy' })
+      s.toggleQuest(d, 'stretch')
+    }
+    for (let i = 0; i < 3; i++) s.saveJournal(addDays(startDate, i), { gratitude: 'A proper bit of writing for the day.' } as never)
+    s.checkProgress()
+    const before = snapshot()
+    const keptBefore = before.xp.filter((e) => /^(chapter|comeback|perfect|waterweek|journalweek|theme):/.test(e.id)).map((e) => e.id).sort()
+    expect(keptBefore.length).toBeGreaterThan(0)
+
+    const raw = exportJson()
+    s.resetAll()
+    expect(useStore.getState().xp).toHaveLength(0)
+    expect(useStore.getState().importData(raw).ok).toBe(true)
+    useStore.getState().checkProgress()
+
+    const after = snapshot()
+    for (const k of Object.keys(initialState()) as (keyof typeof after)[]) {
+      if (k === 'xp') continue
+      expect(after[k], `field ${String(k)}`).toEqual(before[k])
+    }
+    expect(after.envelopeSince).toBe(before.envelopeSince)
+    // Every XP entry is back, nothing doubled, and the kept bonuses are all still there.
+    expect(after.xp.map((e) => e.id).sort()).toEqual(before.xp.map((e) => e.id).sort())
+    expect(new Set(after.xp.map((e) => e.id)).size).toBe(after.xp.length)
+    expect(after.xp.filter((e) => /^(chapter|comeback|perfect|waterweek|journalweek|theme):/.test(e.id)).map((e) => e.id).sort()).toEqual(keptBefore)
+    expect(after.xp.reduce((n, e) => n + e.amount, 0)).toBe(before.xp.reduce((n, e) => n + e.amount, 0))
+  })
+  it('an old backup without envelopeSince gets a baseline on import so past bosses and night walks do not unlock envelopes', async () => {
+    const { exportJson } = await import('@/store/useStore')
+    const parsed = JSON.parse(exportJson())
+    delete parsed.envelopeSince
+    parsed.profile = { name: 'T', startDate: addDays(todayKeyForTest(), -20), units: 'lb', onboarded: true }
+    useStore.getState().resetAll()
+    expect(useStore.getState().importData(JSON.stringify(parsed)).ok).toBe(true)
+    expect(useStore.getState().envelopeSince).toBeTruthy()
+  })
+})
