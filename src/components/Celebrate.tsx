@@ -19,6 +19,6 @@ export function burst(opts: { big?: boolean } = {}) {
 }
 
 export function hearts() {
-  const heart = confetti.shapeFromText({ text: '💗', scalar: 2 })
-  confetti({ shapes: [heart], scalar: 2, particleCount: 24, spread: 90, origin: { y: 0.7 }, disableForReducedMotion: true })
+  // Plain pink shapes, not emoji bitmaps: much lighter on a phone's graphics memory.
+  confetti({ colors: ['#f9a8d4', '#f472b6', '#c4b5fd'], shapes: ['circle'], scalar: 0.9, particleCount: 14, spread: 80, gravity: 0.9, ticks: 120, origin: { y: 0.7 }, disableForReducedMotion: true })
 }
