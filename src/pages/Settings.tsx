@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { clsx } from 'clsx'
-import { useStore, exportJson } from '@/store/useStore'
+import { useStore } from '@/store/useStore'
 import { useUi, type Theme } from '@/store/ui'
 import { useStats } from '@/lib/hooks'
 import { todayKey, addDays, formatDate } from '@/lib/dates'
@@ -9,7 +9,7 @@ import { resetTimes } from '@/lib/dayReset'
 import { ResetSelect } from '@/components/DayReset'
 import { PageHeader, Card, SectionTitle, Modal, confirmDialog } from '@/components/ui'
 import { Download, Upload, Moon, Sun, Monitor, Vibrate, EyeOff, Images, ChevronRight, ChevronLeft, UserRound, Bell, Target, Clock, Palette, ShieldCheck, type LucideIcon } from 'lucide-react'
-import { downloadAllPhotos } from '@/store/photos'
+import { downloadAllPhotos, exportBackup, importBackup } from '@/store/photos'
 import { waterSettings, fromMl, toMl, convertWaterSettings, type WaterUnit } from '@/lib/water'
 import { usePush } from '@/store/push'
 import { pushSummary } from '@/lib/notifyText'
@@ -23,7 +23,6 @@ import { useSync, syncConfigured, hasLocalBackup, localBackupJson } from '@/stor
 function useSettings() {
   const profile = useStore((s) => s.profile)
   const setProfile = useStore((s) => s.setProfile)
-  const importData = useStore((s) => s.importData)
   const resetAll = useStore((s) => s.resetAll)
   const theme = useUi((s) => s.theme)
   const setTheme = useUi((s) => s.setTheme)
@@ -68,17 +67,20 @@ function useSettings() {
     URL.revokeObjectURL(a.href)
   }
 
-  const doExport = () => {
-    const blob = new Blob([exportJson()], { type: 'application/json' })
+  const doExport = async () => {
+    setMsg(null)
+    const { json, photos, missed } = await exportBackup()
+    const blob = new Blob([json], { type: 'application/json' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob); a.download = `90-day-era-${todayKey()}.json`; a.click()
     URL.revokeObjectURL(a.href)
+    if (missed) setMsg(`Backup saved with ${photos} ${photos === 1 ? 'photo' : 'photos'}. ${missed} couldn’t be fetched right now, so ${missed === 1 ? 'it isn’t' : 'they aren’t'} in the file.`)
   }
   const doImport = async (f: File) => {
     const text = await f.text()
     if (!(await confirmDialog('Importing replaces everything currently saved on this device. Continue?', { confirmLabel: 'Import', danger: true }))) return
-    const r = importData(text)
-    setMsg(r.ok ? 'Import complete.' : r.error || 'Import failed.')
+    const r = await importBackup(text)
+    setMsg(!r.ok ? r.error || 'Import failed.' : r.missing > 0 ? `Import complete. ${r.missing} ${r.missing === 1 ? 'photo' : 'photos'} weren’t in that file.` : 'Import complete.')
     if (r.ok) { setName(useStore.getState().profile.name); setStart(useStore.getState().profile.startDate ?? todayKey()) }
   }
 
@@ -244,12 +246,12 @@ export default function SettingsPage() {
         <SectionTitle sub={signedIn ? 'Synced to your account. Export gives you an extra copy you hold yourself.' : 'Everything lives in this browser. Export regularly, or to move to another device.'}>Your data</SectionTitle>
         <Card className="space-y-3">
           <div className="grid sm:grid-cols-2 gap-2">
-            <button className="btn-soft py-3" onClick={doExport}><Download size={16} /> Export backup (.json)</button>
+            <button className="btn-soft py-3" onClick={() => void doExport()}><Download size={16} /> Export backup (.json)</button>
             <button className="btn-soft py-3" onClick={() => fileRef.current?.click()}><Upload size={16} /> Import backup</button>
-            <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) doImport(f); e.target.value = '' }} />
+            <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void doImport(f); e.target.value = '' }} />
           </div>
           {photoCount > 0 && <button className="btn-soft py-3 w-full" disabled={zipping} onClick={() => void savePhotos()}><Images size={16} /> {zipping ? 'Gathering photos…' : `Download my photos (${photoCount}, .zip)`}</button>}
-          {photoCount > 0 && <div className="text-xs text-muted">The backup file holds your logs but not your photos. Download those separately.</div>}
+          {photoCount > 0 && <div className="text-xs text-muted">The backup file includes your photos, so it can be large. The .zip is just a copy of the pictures to keep.</div>}
           {msg && <div className="text-sm text-lavender-600 dark:text-lavender-300">{msg}</div>}
           <div className="text-xs text-muted">{stats.daysLogged} active days · {stats.lifetimeXp} lifetime XP · {Object.keys(useStore.getState().badges).length} badges</div>
         </Card>

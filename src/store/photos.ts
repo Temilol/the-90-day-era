@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { create } from 'zustand'
-import { useStore } from './useStore'
+import { useStore, exportJson } from './useStore'
 import { useSync, getClient, PHOTO_BUCKET } from './sync'
 import { photoGet, photoPut, photoDelete, newPhotoId, type PhotoRecord } from '@/lib/photoStore'
 import { makeZip } from '@/lib/zip'
@@ -186,4 +186,57 @@ export async function downloadAllPhotos(): Promise<{ saved: number; missed: numb
   }
   if (files.length) download(new Blob([makeZip(files) as BlobPart], { type: 'application/zip' }), '90-day-era-photos.zip')
   return { saved: files.length, missed }
+}
+
+// ---------- the backup file ----------
+function toBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf)
+  let out = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) out += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return btoa(out)
+}
+function fromBase64(text: string): ArrayBuffer {
+  const bin = atob(text)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return bytes.buffer
+}
+
+/** The backup file with the pictures inside it (as `photoData`, keyed by photo id). `missed` counts photos that could not be fetched. */
+export async function exportBackup(): Promise<{ json: string; photos: number; missed: number }> {
+  const data = JSON.parse(exportJson()) as Record<string, unknown>
+  const photoData: Record<string, string> = {}
+  let missed = 0
+  for (const p of useStore.getState().photos ?? []) {
+    const rec = await fetchRecord(p.id).catch(() => null)
+    if (rec) photoData[p.id] = toBase64(rec.data)
+    else missed++
+  }
+  if (Object.keys(photoData).length) data.photoData = photoData
+  return { json: JSON.stringify(data, null, 2), photos: Object.keys(photoData).length, missed }
+}
+
+/** Restore a backup file and the pictures that came with it. Older files have no pictures; their photo slots stay empty. */
+export async function importBackup(raw: string): Promise<{ ok: boolean; error?: string; photos: number; missing: number }> {
+  let photoData: Record<string, unknown> = {}
+  let text = raw
+  try {
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed === 'object' && parsed.photoData && typeof parsed.photoData === 'object') {
+      photoData = parsed.photoData
+      delete parsed.photoData // keep the pictures out of the saved data
+      text = JSON.stringify(parsed)
+    }
+  } catch { /* importData reports an unreadable file */ }
+  const r = useStore.getState().importData(text)
+  if (!r.ok) return { ...r, photos: 0, missing: 0 }
+  let restored = 0
+  for (const p of useStore.getState().photos ?? []) {
+    const b64 = photoData[p.id]
+    if (typeof b64 !== 'string') continue
+    try { await photoPut({ id: p.id, data: fromBase64(b64) }); restored++ } catch { /* skip a damaged picture */ }
+  }
+  const total = (useStore.getState().photos ?? []).length
+  schedule()
+  return { ok: true, photos: restored, missing: total - restored }
 }
