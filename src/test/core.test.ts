@@ -514,6 +514,11 @@ describe('envelopes: tiers, pick one of three, prizes you keep', () => {
     useStore.getState().drawEnvelope('day30')
     expect(useStore.getState().envelopes.day30.options).toEqual(first) // reopening can't re-roll
   })
+  it('every prize has its own key', async () => {
+    const { PRIZES } = await import('@/content/envelopes')
+    const keys = PRIZES.map((p) => p.key)
+    expect(keys.filter((k, i) => keys.indexOf(k) !== i)).toEqual([])
+  })
   it('picking keeps one prize, adds XP prizes straight away, and can only happen once', () => {
     setup({ envelopes: { ...unlocked('day7', ['xp25', 'drink', 'swap']), ...unlocked('day30', ['freeze', 'double', 'off20']) } })
     const s = useStore.getState()

@@ -89,6 +89,9 @@ export const PRIZES: PrizeDef[] = [
   { key: 'bathset', kind: 'treat', tiers: ['rare'], title: 'A bath set, bombs or oils', text: 'Up to $20.', emoji: '🫧' },
   { key: 'lunch', kind: 'treat', tiers: ['rare'], title: 'A lunch out on a shift day', text: 'Skip the packed lunch for once, up to $20.', emoji: '🥗' },
   { key: 'hair', kind: 'treat', tiers: ['rare'], title: 'Hair accessories', text: 'Scrunchies, clips or a headband, up to $20.', emoji: '🎀' },
+  { key: 'casual-dinner', kind: 'treat', tiers: ['rare'], title: 'A casual dinner out', text: 'Somewhere relaxed, up to $35.', emoji: '🍝' },
+  { key: 'bake', kind: 'treat', tiers: ['rare'], title: 'Something to bake or cook', text: 'The ingredients for something you’ve wanted to make, up to $30.', emoji: '🧁' },
+  { key: 'audio', kind: 'treat', tiers: ['rare'], title: 'An audiobook or a magazine', text: 'Your pick, up to $20.', emoji: '📚' },
   // legendary
   { key: 'xp75', kind: 'xp', tiers: ['legendary'], title: '75 bonus XP', text: 'A legendary drop, added to your total straight away.', emoji: '🌟', xp: 75 },
   { key: 'off35', kind: 'discount', tiers: ['legendary'], title: '35% off a shop reward', text: 'Use it when you unlock any reward in the shop. Save it for a big one.', emoji: '🎫', pct: 35 },
@@ -100,6 +103,7 @@ export const PRIZES: PrizeDef[] = [
   { key: 'concert', kind: 'treat', tiers: ['legendary'], title: 'A concert, show or event ticket', text: 'Your choice, up to $70.', emoji: '🎟️' },
   { key: 'pajamas', kind: 'treat', tiers: ['legendary'], title: 'A pajama or loungewear set', text: 'Soft, cosy and yours, up to $50.', emoji: '🌙' },
   { key: 'outing', kind: 'treat', tiers: ['legendary'], title: 'An outing, your choice', text: 'Mini golf, bowling, an escape room. Up to $50.', emoji: '🎳' },
+  { key: 'fancy-brunch', kind: 'treat', tiers: ['legendary'], title: 'A fancy brunch', text: 'Somewhere special, the full menu, up to $60.', emoji: '🥂' },
   { key: 'double2', kind: 'double', tiers: ['legendary'], title: 'Double XP, two days in a row', text: 'Switch it on and today’s and tomorrow’s walks both earn double.', emoji: '⚡', days: 2 },
   { key: 'day-out', kind: 'treat', tiers: ['legendary'], title: 'A day out, planned by you', text: 'Somewhere you’ve been meaning to go. Put it in the calendar.', emoji: '🗺️' },
 ]
