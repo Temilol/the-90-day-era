@@ -793,6 +793,30 @@ describe('secret envelopes', () => {
     s.checkProgress()
     expect([has('day5'), has('boss-down'), has('str10')]).toEqual([true, false, false])
   })
+  it('the five gap-filling envelopes: Three-Week Streak, 40 Workouts, Strong Twenty, Boss Slayer, Eight Days to Go', async () => {
+    const { BOSSES } = await import('@/content/bosses')
+    const { ENVELOPE_DEFS } = await import('@/content/envelopes')
+    const ids = ['streak21', 'w40', 'str20', 'boss10', 'day82']
+    expect(ids.every((id) => ENVELOPE_DEFS.some((d) => d.id === id))).toBe(true)
+    expect(Object.fromEntries(['common', 'rare', 'legendary'].map((t) => [t, ENVELOPE_DEFS.filter((d) => d.tier === t).length]))).toEqual({ common: 9, rare: 15, legendary: 10 })
+    const today = todayKeyForTest()
+    const start = addDays(today, -85)
+    useStore.setState({ ...initialState(), profile: { name: 'T', startDate: start, units: 'lb', onboarded: true } })
+    const s = useStore.getState()
+    // Not there yet: 39 walks, 19 strength sessions, 9 bosses, day 80.
+    for (let i = 0; i < 39; i++) s.logWorkout(addDays(start, i), { minutes: 30, incline: 12, speed: 3 })
+    for (let i = 0; i < 19; i++) s.logStrength(addDays(start, i), 10)
+    for (const b of BOSSES.slice(0, 9)) s.claimBoss(b.id)
+    s.checkProgress()
+    const has = (id: string) => !!useStore.getState().envelopes[id]
+    expect([has('w40'), has('str20'), has('boss10'), has('streak21')]).toEqual([false, false, false, true]) // 39 straight days is a 21-day streak
+    expect(has('day82')).toBe(true) // day 86 and plenty of active days
+    s.logWorkout(addDays(start, 39), { minutes: 30, incline: 12, speed: 3 })
+    s.logStrength(addDays(start, 19), 10)
+    s.claimBoss(BOSSES[9].id)
+    s.checkProgress()
+    expect([has('w40'), has('str20'), has('boss10')]).toEqual([true, true, true])
+  })
   it('The Perfect Week: 6 walks, 4 strength, the reflection and the boss in one week', async () => {
     const { BOSSES } = await import('@/content/bosses')
     fresh()
