@@ -10,4 +10,6 @@ export const THEMES: WalkTheme[] = [
   { id: 'audiobook', name: 'Audiobook Walk', emoji: '📚', blurb: 'One chapter per walk. Plot twists make the time fly.' },
   { id: 'daydream', name: 'Daydream Walk', emoji: '☁️', blurb: 'Instrumental music. Imagine your Day-90 self and what she’s doing.' },
   { id: 'kpop', name: 'Dance Hits Walk', emoji: '💃', blurb: 'Pop, dance, K-pop, whatever makes you want to move.' },
+  { id: 'worship', name: 'Worship Walk', emoji: '🙏', blurb: 'Worship music only. Sing along, lift your hands if you want, and let the walk be part of your worship.' },
+  { id: 'sermon', name: 'Sermon Walk', emoji: '📖', blurb: 'One message, one walk. Pick the sermon you’ve been meaning to listen to, and let it fill the time.' },
 ]
