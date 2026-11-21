@@ -25,6 +25,7 @@ export function ShopPanel() {
   const updateReward = useStore((s) => s.updateReward)
   const removeReward = useStore((s) => s.removeReward)
   const [edit, setEdit] = useState<Partial<Reward> | null>(null)
+  const [source, setSource] = useState<'all' | 'shop' | 'envelope'>('all')
   const [view, setView] = useState<'wish' | 'mine'>(useLocation().hash === '#my-rewards' ? 'mine' : 'wish')
   const [confirmBuy, setConfirmBuy] = useState<Reward | null>(null)
   const prizes = useStore((s) => s.prizes)
@@ -61,9 +62,12 @@ export function ShopPanel() {
     ...purchases.map((p) => ({ key: `b${p.id}`, at: p.at, used: !!p.redeemed, purchase: p })),
     ...prizes.filter((p) => prizeDef(p.key)).map((p) => ({ key: `p${p.id}`, at: p.wonAt, used: prizeUsed(p, { days: allDays, freezes }, today), prize: p })),
   ].sort((a, b) => b.at.localeCompare(a.at))
-  const readyItems = items.filter((i) => !i.used)
-  const usedItems = items.filter((i) => i.used)
-  const waiting = readyItems.length
+  const isFrom = (i: Item, s: typeof source) => s === 'all' || (s === 'shop' ? !!i.purchase : !!i.prize)
+  const shown = items.filter((i) => isFrom(i, source))
+  const readyItems = shown.filter((i) => !i.used)
+  const usedItems = shown.filter((i) => i.used)
+  const waiting = items.filter((i) => !i.used).length
+  const readyIn = (s: typeof source) => items.filter((i) => !i.used && isFrom(i, s)).length
   const purchaseRow = (p: NonNullable<Item['purchase']>) => {
     const r = rewards.find((x) => x.id === p.rewardId)
     const used = !!p.redeemed
@@ -139,7 +143,12 @@ export function ShopPanel() {
           <p className="text-sm text-muted mb-3">Everything you’ve bought in the shop or won from an envelope, in one place.</p>
           {items.length === 0 ? <Empty emoji="🎀" title="Nothing unlocked yet" sub="Your first 100 XP is about four standard walks away." /> : (
             <div className="space-y-2">
-              {readyItems.length === 0 && <p className="text-sm text-muted">Nothing waiting right now.</p>}
+              <div role="group" aria-label="Show rewards from" className="flex gap-2 pb-1">
+                {([['all', 'All'], ['shop', 'Shop'], ['envelope', 'Envelope']] as const).map(([id, label]) => (
+                  <button key={id} type="button" aria-pressed={source === id} onClick={() => setSource(id)} className={clsx('chip py-1.5 px-3', source === id ? 'bg-gradient-to-r from-lavender-500 to-blush-400 text-white' : 'bg-card-2 text-muted')}>{label} {readyIn(id)}</button>
+                ))}
+              </div>
+              {readyItems.length === 0 && <p className="text-sm text-muted">{source === 'all' ? 'Nothing waiting right now.' : source === 'shop' ? 'Nothing waiting from the shop.' : 'Nothing waiting from envelopes.'}</p>}
               {readyItems.map(itemRow)}
               {usedItems.length > 0 && <h3 className="pt-3 text-xs font-bold uppercase tracking-wider text-muted">Used</h3>}
               {usedItems.map(itemRow)}
