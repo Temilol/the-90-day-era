@@ -89,7 +89,7 @@ function PickModal({ id, onClose }: { id: string | null; onClose: () => void }) 
               {won && <p className="text-sm text-muted mt-2 text-balance">{won.text}</p>}
               {won?.xp && <div className="gradient-text font-bold mt-2">+{won.xp} XP added</div>}
               {legacy && <p className="text-xs text-muted mt-2">Opened before rewards could be kept. This one is on your honour.</p>}
-              {won && !won.xp && wonPrize && <p className="text-xs text-muted mt-2">Kept in My rewards below until you use it.</p>}
+              {won && !won.xp && wonPrize && <p className="text-xs text-muted mt-2">Kept in My rewards, in the Shop, until you use it.</p>}
               {def.found && <p className="text-xs mt-3 rounded-2xl bg-card-2 p-3 text-balance"><span className="font-semibold">Secret found.</span> {def.found}</p>}
               {id === 'day90' && <div className="mt-4"><CapsuleLetter /></div>}
               <button className="btn-primary w-full mt-5" onClick={close}>{picked !== null ? (won?.xp ? 'Lovely' : 'Add to my rewards') : 'Close'}</button>
@@ -156,53 +156,68 @@ export function EnvelopeGrid() {
   )
 }
 
-/** Everything won from envelopes: ready to use at the top, used ones below. */
-export function MyRewards() {
-  const prizes = useStore((s) => s.prizes)
+/** Where a reward in My rewards came from. */
+export function SourceTag({ source }: { source: 'shop' | 'envelope' }) {
+  return <span className={clsx('inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0', source === 'shop' ? 'bg-lavender-100 text-lavender-700 dark:bg-lavender-500/20 dark:text-lavender-200' : 'bg-blush-100 text-blush-600 dark:bg-blush-500/20 dark:text-blush-200')}>{source === 'shop' ? 'Shop' : 'Envelope'}</span>
+}
+
+/** One prize won from an envelope, with whatever button it needs. */
+export function PrizeRow({ p }: { p: Prize }) {
   const days = useStore((s) => s.days)
   const freezes = useStore((s) => s.freezes)
   const redeemPrize = useStore((s) => s.redeemPrize)
   const stats = useStats()
   const today = stats.today
-  const rows = prizes.map((p) => ({ p, def: prizeDef(p.key), used: prizeUsed(p, { days, freezes }, today) })).filter((r) => r.def)
-    .sort((a, b) => Number(a.used) - Number(b.used) || b.p.wonAt.localeCompare(a.p.wonAt))
-  const readyCount = rows.filter((r) => !r.used).length
+  const def = prizeDef(p.key)
+  if (!def) return null
+  const used = prizeUsed(p, { days, freezes }, today)
   const short = (d: string) => formatDate(d, { month: 'short', day: 'numeric' })
-  const from = (p: Prize) => ENVELOPE_DEFS.find((d) => d.id === p.from)?.title ?? 'Envelope'
+  const from = ENVELOPE_DEFS.find((d) => d.id === p.from)?.title ?? 'Envelope'
   const linkClass = 'btn-soft !py-1.5 text-xs shrink-0 whitespace-nowrap'
+  const kind = def.kind
+  const pendingDouble = kind === 'double' && used && days[today]?.doubleXp === p.id && !days[today]?.workout
+  const status = kind === 'xp' ? `Added on ${short(p.wonAt.slice(0, 10))}`
+    : !used ? from
+    : kind === 'freeze' ? `Used on ${short(p.usedOn!)}`
+    : kind === 'double' ? (pendingDouble ? 'On today. Log your walk to double it.' : (def.days ?? 1) > 1 ? `Used on ${short(p.usedOn!)} and ${short(addDays(p.usedOn!, 1))}` : `Used on ${short(p.usedOn!)}`)
+    : kind === 'discount' ? `Used on ${p.note ?? 'a shop reward'}`
+    : kind === 'swap' ? `Used on ${short(p.usedOn ?? p.usedAt!.slice(0, 10))}`
+    : `Done on ${short(p.usedAt!.slice(0, 10))}`
+  return (
+    <div className={clsx('flex items-center gap-3 rounded-2xl p-3 min-w-0', used ? 'bg-card-2/60' : 'bg-card-2')}>
+      <span className={clsx('text-2xl leading-none shrink-0', used && 'opacity-50')}>{def.emoji}</span>
+      <div className="flex-1 min-w-0">
+        <div className={clsx('font-semibold text-sm leading-tight break-words', used && 'text-muted')}>{def.title}</div>
+        <div className="text-xs text-muted break-words mt-0.5 flex items-center gap-1.5 flex-wrap"><SourceTag source="envelope" />{status}</div>
+      </div>
+      {!used && kind === 'freeze' && <Link to="/calendar" className={linkClass}>Use</Link>}
+      {!used && kind === 'discount' && <Link to="/rewards#shop" className={linkClass}>Use in shop</Link>}
+      {!used && kind === 'swap' && <Link to="/today" className={linkClass}>Use today</Link>}
+      {!used && kind === 'double' && <button className={linkClass} disabled={!stats.started || stats.finished} onClick={() => { redeemPrize(p.id); hearts() }}>{(def.days ?? 1) > 1 ? 'Start today' : 'Use today'}</button>}
+      {(kind === 'treat' || kind === 'mission') && <button className={used ? 'btn-ghost !py-1.5 text-xs shrink-0 whitespace-nowrap' : linkClass} onClick={() => { redeemPrize(p.id); if (!used) hearts() }}>{used ? 'Undo' : kind === 'treat' ? 'Mark enjoyed' : 'Mark done'}</button>}
+      {used && kind !== 'treat' && kind !== 'mission' && <span className="text-mint-400 shrink-0" aria-label="Used">✓</span>}
+    </div>
+  )
+}
 
+/** On the Mystery page: a pointer to the prizes, which are kept in the Shop's My rewards. */
+export function PrizesTeaser() {
+  const prizes = useStore((s) => s.prizes)
+  const days = useStore((s) => s.days)
+  const freezes = useStore((s) => s.freezes)
+  const today = useStats().today
+  const ready = prizes.filter((p) => prizeDef(p.key) && !prizeUsed(p, { days, freezes }, today)).length
   return (
     <section>
-      <SectionTitle sub={rows.length ? `${readyCount} ready to use` : undefined}>My rewards</SectionTitle>
-      <Card className="space-y-2">
-        {rows.length === 0 && <p className="text-sm text-muted">Rewards you pick from envelopes are kept here until you use them.</p>}
-        {rows.map(({ p, def, used }) => {
-          const kind = def!.kind
-          const pendingDouble = kind === 'double' && used && days[today]?.doubleXp === p.id && !days[today]?.workout
-          const status = kind === 'xp' ? `Added on ${short(p.wonAt.slice(0, 10))}`
-            : !used ? from(p)
-            : kind === 'freeze' ? `Used on ${short(p.usedOn!)}`
-            : kind === 'double' ? (pendingDouble ? 'On today. Log your walk to double it.' : (def!.days ?? 1) > 1 ? `Used on ${short(p.usedOn!)} and ${short(addDays(p.usedOn!, 1))}` : `Used on ${short(p.usedOn!)}`)
-            : kind === 'discount' ? `Used on ${p.note ?? 'a shop reward'}`
-            : kind === 'swap' ? `Used on ${short(p.usedOn ?? p.usedAt!.slice(0, 10))}`
-            : `Done on ${short(p.usedAt!.slice(0, 10))}`
-          return (
-            <div key={p.id} className={clsx('flex items-center gap-3 rounded-2xl p-3 min-w-0', used ? 'bg-card-2/60' : 'bg-card-2')}>
-              <span className={clsx('text-2xl leading-none shrink-0', used && 'opacity-50')}>{def!.emoji}</span>
-              <div className="flex-1 min-w-0">
-                <div className={clsx('font-semibold text-sm leading-tight break-words', used && 'text-muted')}>{def!.title}</div>
-                <div className="text-xs text-muted break-words">{status}</div>
-              </div>
-              {!used && kind === 'freeze' && <Link to="/calendar" className={linkClass}>Use</Link>}
-              {!used && kind === 'discount' && <Link to="/rewards#shop" className={linkClass}>Use in shop</Link>}
-              {!used && kind === 'swap' && <Link to="/today" className={linkClass}>Use today</Link>}
-              {!used && kind === 'double' && <button className={linkClass} disabled={!stats.started || stats.finished} onClick={() => { redeemPrize(p.id); hearts() }}>{(def!.days ?? 1) > 1 ? 'Start today' : 'Use today'}</button>}
-              {(kind === 'treat' || kind === 'mission') && <button className={used ? 'btn-ghost !py-1.5 text-xs shrink-0 whitespace-nowrap' : linkClass} onClick={() => { redeemPrize(p.id); if (!used) hearts() }}>{used ? 'Undo' : 'Mark done'}</button>}
-              {used && kind !== 'treat' && kind !== 'mission' && <span className="text-mint-400 shrink-0" aria-label="Used">✓</span>}
-            </div>
-          )
-        })}
-      </Card>
+      <SectionTitle>My rewards</SectionTitle>
+      <Link to="/rewards#my-rewards" className="card p-4 flex items-center gap-3 hover:shadow-glow transition">
+        <span className="size-11 shrink-0 rounded-2xl grid place-items-center text-2xl bg-lavender-100 dark:bg-lavender-500/20">🎁</span>
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold">{ready > 0 ? `${ready} ${ready === 1 ? 'prize' : 'prizes'} ready to use` : 'No prizes waiting'}</div>
+          <div className="text-xs text-muted">Prizes from your envelopes are kept in My rewards, in the Shop.</div>
+        </div>
+        <span className="text-xs font-semibold underline text-lavender-600 dark:text-lavender-300 shrink-0">View</span>
+      </Link>
     </section>
   )
 }

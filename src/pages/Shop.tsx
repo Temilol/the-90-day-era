@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { clsx } from 'clsx'
-import { readyPrizes } from '@/lib/prizes'
+import { useLocation } from 'react-router-dom'
+import { readyPrizes, prizeUsed } from '@/lib/prizes'
+import { PrizeRow, SourceTag } from '@/components/Envelopes'
 import { prizeDef } from '@/content/envelopes'
 import { todayKey } from '@/lib/dates'
 import { useStore } from '@/store/useStore'
@@ -23,7 +25,7 @@ export function ShopPanel() {
   const updateReward = useStore((s) => s.updateReward)
   const removeReward = useStore((s) => s.removeReward)
   const [edit, setEdit] = useState<Partial<Reward> | null>(null)
-  const [view, setView] = useState<'wish' | 'mine'>('wish')
+  const [view, setView] = useState<'wish' | 'mine'>(useLocation().hash === '#my-rewards' ? 'mine' : 'wish')
   const [confirmBuy, setConfirmBuy] = useState<Reward | null>(null)
   const prizes = useStore((s) => s.prizes)
   const allDays = useStore((s) => s.days)
@@ -52,7 +54,31 @@ export function ShopPanel() {
     setEdit((e) => ({ ...e, image: c.toDataURL('image/jpeg', 0.8) }))
   }
   const locked = !!edit?.id && !edit.custom
-  const waiting = purchases.filter((p) => !p.redeemed).length
+  // One list for everything she has earned: bought in the shop, or won from an envelope.
+  const today = stats.today
+  type Item = { key: string; at: string; used: boolean; purchase?: (typeof purchases)[number]; prize?: (typeof prizes)[number] }
+  const items: Item[] = [
+    ...purchases.map((p) => ({ key: `b${p.id}`, at: p.at, used: !!p.redeemed, purchase: p })),
+    ...prizes.filter((p) => prizeDef(p.key)).map((p) => ({ key: `p${p.id}`, at: p.wonAt, used: prizeUsed(p, { days: allDays, freezes }, today), prize: p })),
+  ].sort((a, b) => b.at.localeCompare(a.at))
+  const readyItems = items.filter((i) => !i.used)
+  const usedItems = items.filter((i) => i.used)
+  const waiting = readyItems.length
+  const purchaseRow = (p: NonNullable<Item['purchase']>) => {
+    const r = rewards.find((x) => x.id === p.rewardId)
+    const used = !!p.redeemed
+    return (
+      <div className={clsx('flex items-center gap-3 rounded-2xl p-3 min-w-0', used ? 'bg-card-2/60' : 'bg-card-2')}>
+        <span className={clsx('text-2xl leading-none shrink-0', used && 'opacity-50')}>{r?.emoji ?? '🎁'}</span>
+        <div className="flex-1 min-w-0">
+          <div className={clsx('font-semibold text-sm leading-tight break-words', used && 'text-muted line-through')}>{p.name}</div>
+          <div className="text-xs text-muted break-words mt-0.5 flex items-center gap-1.5 flex-wrap"><SourceTag source="shop" />{p.cost} XP{r?.budget ? ` · up to $${r.budget}` : ''}</div>
+        </div>
+        <button className={used ? 'btn-ghost !py-1.5 text-xs shrink-0 whitespace-nowrap' : 'btn-soft !py-1.5 text-xs shrink-0 whitespace-nowrap'} onClick={() => redeem(p.id)}>{used ? 'Undo' : 'Mark enjoyed'}</button>
+      </div>
+    )
+  }
+  const itemRow = (i: Item) => <div key={i.key}>{i.purchase ? purchaseRow(i.purchase) : <PrizeRow p={i.prize!} />}</div>
   const walksAway = (xp: number) => Math.max(1, Math.ceil(xp / XP.walkFull))
 
   return (
@@ -110,15 +136,13 @@ export function ShopPanel() {
         </>
       ) : (
         <section>
-          <p className="text-sm text-muted mb-3">Tap a reward to mark it as enjoyed.</p>
-          {purchases.length === 0 ? <Empty emoji="🎀" title="Nothing unlocked yet" sub="Your first 100 XP is about four standard walks away." /> : (
+          <p className="text-sm text-muted mb-3">Everything you’ve bought in the shop or won from an envelope, in one place.</p>
+          {items.length === 0 ? <Empty emoji="🎀" title="Nothing unlocked yet" sub="Your first 100 XP is about four standard walks away." /> : (
             <div className="space-y-2">
-              {[...purchases].reverse().map((p) => (
-                <button key={p.id} onClick={() => redeem(p.id)} className={clsx('card w-full p-3 flex items-center gap-3 text-left', p.redeemed && 'opacity-60')}>
-                  <span className="text-2xl">{rewards.find((r) => r.id === p.rewardId)?.emoji ?? '🎁'}</span>
-                  <div className="flex-1"><div className={clsx('font-medium', p.redeemed && 'line-through')}>{p.name}</div><div className="text-xs text-muted">{p.cost} XP{rewards.find((r) => r.id === p.rewardId)?.budget ? ` · up to $${rewards.find((r) => r.id === p.rewardId)!.budget}` : ''} · {new Date(p.at).toLocaleDateString()}{p.redeemed ? ' · enjoyed ✓' : ' · tap when enjoyed'}</div></div>
-                </button>
-              ))}
+              {readyItems.length === 0 && <p className="text-sm text-muted">Nothing waiting right now.</p>}
+              {readyItems.map(itemRow)}
+              {usedItems.length > 0 && <h3 className="pt-3 text-xs font-bold uppercase tracking-wider text-muted">Used</h3>}
+              {usedItems.map(itemRow)}
             </div>
           )}
         </section>

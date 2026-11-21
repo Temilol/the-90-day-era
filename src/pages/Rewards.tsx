@@ -15,7 +15,7 @@ export default function Rewards() {
   // The tab comes from the link (/rewards#shop); with no tab, the one she used last.
   const loc = useLocation()
   const hash = loc.hash.slice(1)
-  const tab: Tab = hash === 'badges' || hash === 'shop' ? hash : hash === 'xp' ? 'xp' : lastTab()
+  const tab: Tab = hash === 'my-rewards' ? 'shop' : hash === 'badges' || hash === 'shop' ? hash : hash === 'xp' ? 'xp' : lastTab()
   // Only a tab she chose herself is remembered.
   useEffect(() => { if (hash) try { localStorage.setItem(LAST_TAB, tab) } catch { /* private mode */ } }, [tab, hash])
 

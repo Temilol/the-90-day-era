@@ -4,7 +4,7 @@ import { clsx } from 'clsx'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStore } from '@/store/useStore'
 import { useStats } from '@/lib/hooks'
-import { EnvelopeGrid, MyRewards, TimeCapsule } from '@/components/Envelopes'
+import { EnvelopeGrid, PrizesTeaser, TimeCapsule } from '@/components/Envelopes'
 import { WHEEL } from '@/content/wheel'
 import { THEMES } from '@/content/themes'
 import { PageHeader, SectionTitle, Card } from '@/components/ui'
@@ -85,7 +85,7 @@ export default function Mystery() {
       {/* Every tab stays mounted, so a spin result is still there after a look at another tab. */}
       <div hidden={tab !== 'envelopes'} className="space-y-8">
         <EnvelopeGrid />
-        <MyRewards />
+        <PrizesTeaser />
         <TimeCapsule />
       </div>
 
